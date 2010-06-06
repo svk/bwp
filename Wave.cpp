@@ -210,3 +210,32 @@ double SquareWave::advance(double dt) {
     return (phase < halfwl) ? 1.0 : -1.0;
 }
 
+bool PiecewiseLinearClosedSupport::nil(void) const {
+    return t > t1;
+}
+
+bool DelayedWave::nil(void) const {
+    return wave->nil();
+}
+
+bool SumWave::nil(void) const {
+    for(std::vector<WaveStream*>::iterator i = waves.begin(); i != waves.end(); i++) {
+        if( !(*i)->nil() ) return false;
+    }
+    return true;
+}
+
+bool ProductWave::nil(void) const {
+    for(std::vector<WaveStream*>::iterator i = waves.begin(); i != waves.end(); i++) {
+        if( (*i)->nil() ) return true;
+    }
+    return false;
+}
+
+bool CutoffEnvelope::nil(void) const {
+    return t > t1;
+}
+
+
+
+

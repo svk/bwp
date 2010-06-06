@@ -22,6 +22,7 @@ class WaveStream {
         virtual ~WaveStream() {}
 
         virtual double advance(double) = 0;
+        virtual bool nil(void) const { return false; }
 };
 
 class SineEnvelope : public WaveStream {
@@ -59,6 +60,7 @@ class PiecewiseLinearClosedSupport : public WaveStream {
         ~PiecewiseLinearClosedSupport();
 
         double advance(double);
+        bool nil(void) const;
 
     private:
         double t0, t1;
@@ -73,6 +75,7 @@ class DelayedWave : public WaveStream {
         ~DelayedWave();
 
         double advance(double t);
+        bool nil(void) const;
     private:
         WaveStream *wave;
         double delay;
@@ -86,6 +89,7 @@ class SumWave : public WaveStream {
         SumWave& add(WaveStream*);
     
         double advance(double t);
+        bool nil(void) const;
     private:
         std::vector<WaveStream*> waves;
 };
@@ -98,6 +102,7 @@ class ProductWave : public WaveStream {
         ProductWave& add(WaveStream*);
     
         double advance(double t);
+        bool nil(void) const;
     private:
         std::vector<WaveStream*> waves;
 };
@@ -107,6 +112,7 @@ class CutoffEnvelope : public WaveStream {
         CutoffEnvelope(double, double);
 
         double advance(double);
+        bool nil(void) const;
 
     private:
         const double t0, t1;
