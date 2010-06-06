@@ -11,6 +11,7 @@
 WaveFileExporter::WaveFileExporter() :
     sampleRate( -1 ),
     fakeStereo( false ),
+    untilNil( false ),
     filename ( "" ),
     file ( 0 ),
     adoptOutput ( false ),
@@ -68,6 +69,13 @@ WaveFileExporter& WaveFileExporter::setAdoptOutput(bool state_ ) {
     return *this;
 }
 
+WaveFileExporter& WaveFileExporter::setSpanUntilNil(double t0_) {
+    t0 = t0_;
+    untilNil = true;
+    return *this;
+}
+
+
 WaveFileExporter& WaveFileExporter::setSpan(double t0_, double t1_) {
     t0 = t0_;
     t1 = t1_;
@@ -80,9 +88,35 @@ WaveFileExporter& WaveFileExporter::setInput( WaveStream* wave_ ) {
 }
 
 void WaveFileExporter::write() {
-    /* Not implemented yet! */
     const int fmtHeaderSize = 24;
-    const int noSamples = (int)(0.5 + (t1-t0)*sampleRate);
+    int noSamples;
+
+    std::vector<double> samples;
+    const double dt = 1.0 / (double) sampleRate;
+    double t = t0;
+    double max_abs = 0.0;
+   
+    if( !untilNil ) {
+        noSamples = (int)(0.5 + (t1-t0)*sampleRate);
+        int i = 0;
+        while( i < noSamples ) {
+            double x = input->advance( dt );
+            samples.push_back( x );
+            if( fabs(x) > max_abs ) {
+                max_abs = fabs(x);
+            }
+            i++;
+        }
+    } else {
+        do {
+            double x = input->advance(dt);
+            samples.push_back( x );
+            if( fabs(x) > max_abs ) {
+                max_abs = fabs(x);
+            }
+        } while( !input->nil() );
+        noSamples = samples.size();
+    }
 
     uint32_t data;
 
@@ -108,19 +142,6 @@ void WaveFileExporter::write() {
     writeInt32( noSamples * blockSize * channels );
 
     const double uintAmp = (std::numeric_limits<uint16_t>::max() >> 1);
-    const double dt = 1.0 / (double) sampleRate;
-    double t = t0;
-    int i = 0;
-    double max_abs = 0.0;
-    std::vector<double> samples;
-    while( i < noSamples ) {
-        double x = input->advance( dt );
-        samples.push_back( x );
-        if( fabs(x) > max_abs ) {
-            max_abs = fabs(x);
-        }
-        i++;
-    }
     for(std::vector<double>::iterator i = samples.begin(); i != samples.end(); i++) {
         double x = *i;
         if( normalize ) {

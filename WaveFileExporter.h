@@ -17,6 +17,7 @@ class WaveFileExporter {
         WaveFileExporter& setOutputFilename(const std::string&);
         WaveFileExporter& setAdoptOutput(bool = true);
         WaveFileExporter& setSpan(double, double);
+        WaveFileExporter& setSpanUntilNil(double);
         WaveFileExporter& setInput( WaveStream* );
 
         void write();
@@ -26,6 +27,7 @@ class WaveFileExporter {
         int sampleRate;
         bool fakeStereo;
         bool normalize;
+        bool untilNil;
         std::string filename;
         FILE * file;
         bool adoptOutput;

@@ -219,14 +219,14 @@ bool DelayedWave::nil(void) const {
 }
 
 bool SumWave::nil(void) const {
-    for(std::vector<WaveStream*>::iterator i = waves.begin(); i != waves.end(); i++) {
+    for(std::vector<WaveStream*>::const_iterator i = waves.begin(); i != waves.end(); i++) {
         if( !(*i)->nil() ) return false;
     }
     return true;
 }
 
 bool ProductWave::nil(void) const {
-    for(std::vector<WaveStream*>::iterator i = waves.begin(); i != waves.end(); i++) {
+    for(std::vector<WaveStream*>::const_iterator i = waves.begin(); i != waves.end(); i++) {
         if( (*i)->nil() ) return true;
     }
     return false;
