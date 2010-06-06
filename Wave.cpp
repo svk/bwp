@@ -132,3 +132,26 @@ double ProductWave::sample( double t ) const {
     }
     return s;
 }
+
+ExponentialFadeoutEnvelope::ExponentialFadeoutEnvelope(double alpha_) :
+    alpha ( alpha_ )
+{
+}
+
+double ExponentialFadeoutEnvelope::sample(double t) const {
+    if( t < 0.0 ) {
+        return 1.0;
+    }
+    return exp( - alpha * t );
+}
+
+CutoffEnvelope::CutoffEnvelope( double t0_, double t1_ ) :
+    t0 ( t0_ ),
+    t1 ( t1_ )
+{
+}
+
+double CutoffEnvelope::sample(double t) const {
+    if( t < t0 || t > t1 ) return 0.0;
+    return 1.0;
+}

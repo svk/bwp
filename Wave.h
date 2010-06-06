@@ -96,4 +96,25 @@ class ProductWave : public AudioFunction {
         std::vector<const AudioFunction *> waves;
 };
 
+class CutoffEnvelope : public AudioFunction {
+    public:
+        CutoffEnvelope(double, double);
+
+        double sample(double t) const;
+
+    private:
+        double t0, t1;
+};
+
+
+class ExponentialFadeoutEnvelope : public AudioFunction {
+    public:
+        ExponentialFadeoutEnvelope(double);
+
+        double sample(double t) const;
+
+    private:
+        double alpha;
+};
+
 #endif

@@ -21,11 +21,11 @@ int main(int argc, char *argv[]) {
     TranslatedWave beta ( sound440, 0.3 );
     TranslatedWave gamma ( sound660, 0.6 );
 
-    PiecewiseLinearClosedSupport fadeout;
-    fadeout.add( 0.05, 1.0 ).add( 1.0, 0.0 );
-    ProductWave fadeout_prime;
-    fadeout_prime.add( fadeout ).add( vibrato );
-    SoundWave fadeout_sound ( sine440, fadeout_prime );
+
+    ExponentialFadeoutEnvelope fadeout ( 2.0 );
+    CutoffEnvelope cutoff ( 0.0, 3.0 );
+    ProductWave fadeout_sound;
+    fadeout_sound.add( cutoff ).add( fadeout ).add( vibrato ).add( sine440 );
     TranslatedWave alpha ( fadeout_sound, 1.5 );
     
     SumWave allwaves;
@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
                                                   .setFakeStereo()
                                                   .setNormalize()
                                                   .setOutputFilename( "TestWaveFile-output.wav" )
-                                                  .setSpan( 0.0, 3.0 )
+                                                  .setSpan( 0.0, 6.0 )
                                                   .setInput( allwaves );
     exporter.write();
 
