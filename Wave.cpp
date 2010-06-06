@@ -26,22 +26,6 @@ double SineEnvelope::advance(double dt) {
     return x * amplitude + baseline;
 }
 
-SineWave::SineWave( double frequency_,
-                    double phase_ ) :
-    frequency ( frequency_ ),
-    phase ( phase_ ),
-    t ( 0 )
-{
-}
-
-SineWave::~SineWave() {
-}
-
-double SineWave::advance(double dt) {
-    t += dt;
-    return sin( 2 * M_PI * (frequency * t + phase) );
-}
-
 PiecewiseLinearClosedSupport::~PiecewiseLinearClosedSupport() {
 }
 
@@ -236,6 +220,36 @@ bool CutoffEnvelope::nil(void) const {
     return t > t1;
 }
 
+SineWave::SineWave(double frequency_, double phase_) :
+    frequency( frequency ),
+    phase( phase )
+{
+}
 
+double SineWave::advance(double dt) {
+    double none;
+    phase = modf( phase + dt * frequency, &none );
+    return sin( phase * 2.0 * M_PI );
+}
+
+DynamicSineWave::DynamicSineWave(WaveStream *frequency_, double phase_) :
+    frequency ( frequency_ ),
+    phaseNormal( phase_ )
+{
+}
+
+DynamicSineWave::~DynamicSineWave() {
+    delete frequency;
+}
+
+double DynamicSineWave::advance(double dt) {
+    double freqNow = frequency->advance( dt );
+    double none;
+    phaseNormal = modf( phaseNormal + dt * freqNow, &none );
+    return sin( phaseNormal * 2.0 * M_PI );
+}
+
+SineWave::~SineWave() {
+}
 
 

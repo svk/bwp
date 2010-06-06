@@ -48,8 +48,7 @@ class SineWave : public WaveStream {
         double advance(double);
 
     private:
-        const double frequency, phase;
-        double t;
+        double frequency, phase;
 };
 
 class PiecewiseLinearClosedSupport : public WaveStream {
@@ -153,6 +152,18 @@ class SquareWave : public WaveStream {
     private:
         const double wavelength;
         double phase;
+};
+
+class DynamicSineWave : public WaveStream {
+    public:
+        DynamicSineWave( WaveStream *frequency,
+                         double phase = 0 );
+
+        ~DynamicSineWave();
+        double advance(double);
+    private:
+        WaveStream *frequency;
+        double phaseNormal;
 };
 
 #endif
