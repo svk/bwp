@@ -9,18 +9,11 @@ int main(int argc, char *argv[]) {
 
     SineEnvelope vibrato ( 14, 0.9, 0.1 );
 
-    ProductWave envelope_prime = ProductWave().add( envelope ).add( vibrato );
-
-    SoundWave sound ( sine, envelope_prime );
-
-    TranslatedWave alpha ( sound, 0.0 );
-    TranslatedWave beta ( sound, 0.3 );
-    TranslatedWave gamma ( sound, 2.0 );
-    SumWave allwaves;
-    allwaves.add( alpha ).add( beta ).add( gamma );
-
-    for(double t = 0; t < 3.0; t += 0.001 ) {
-        printf( "%lf\t%lf\t%lf\n", t, allwaves.sample(t), beta.sample( t ) );
+    const double dt = 0.001;
+    double t = 0;
+    for(int i=0;i<3000;i++) {
+        t += 0.001;
+        printf( "%lf\t%lf\t%lf\t%lf\n", t, sine.advance(dt), envelope.advance(dt), vibrato.advance(dt) );
     }
     return 0;
 }

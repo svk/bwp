@@ -10,14 +10,17 @@ SineEnvelope::SineEnvelope( double frequency_,
     frequency ( frequency_ ),
     baseline ( baseline_ ),
     amplitude ( amplitude_ ),
-    phase ( phase_ )
+    phase ( phase_ ),
+    t ( 0 )
 {
 }
 
 SineEnvelope::~SineEnvelope() {
 }
 
-double SineEnvelope::sample(double t) const {
+double SineEnvelope::advance(double dt) {
+    t += dt;
+
     const double x = sin( 2 * M_PI * (frequency * t + phase) );
     return x * amplitude + baseline;
 }
@@ -25,14 +28,16 @@ double SineEnvelope::sample(double t) const {
 SineWave::SineWave( double frequency_,
                     double phase_ ) :
     frequency ( frequency_ ),
-    phase ( phase_ )
+    phase ( phase_ ),
+    t ( 0 )
 {
 }
 
 SineWave::~SineWave() {
 }
 
-double SineWave::sample(double t) const {
+double SineWave::advance(double dt) {
+    t += dt;
     return sin( 2 * M_PI * (frequency * t + phase) );
 }
 
@@ -59,6 +64,7 @@ PiecewiseLinearClosedSupport::~PiecewiseLinearClosedSupport() {
 PiecewiseLinearClosedSupport::PiecewiseLinearClosedSupport( double t0_ ) :
     t0 ( t0_ ),
     t1 ( t0_ ),
+    t ( 0 ),
     points ()
 {
 }
@@ -69,7 +75,9 @@ PiecewiseLinearClosedSupport& PiecewiseLinearClosedSupport::add( double duration
     return *this;
 }
 
-double PiecewiseLinearClosedSupport::sample(double t) const {
+double PiecewiseLinearClosedSupport::advance(double dt) {
+    t += dt;
+
     if( t < t0 || t >  t1 ) return 0.0;
     double a = t0;
     double av = 0.0;
@@ -134,11 +142,14 @@ double ProductWave::sample( double t ) const {
 }
 
 ExponentialFadeoutEnvelope::ExponentialFadeoutEnvelope(double alpha_) :
-    alpha ( alpha_ )
+    alpha ( alpha_ ),
+    t ( 0 )
 {
 }
 
-double ExponentialFadeoutEnvelope::sample(double t) const {
+double ExponentialFadeoutEnvelope::advance(double dt) {
+    t += dt;
+
     if( t < 0.0 ) {
         return 1.0;
     }
@@ -147,11 +158,14 @@ double ExponentialFadeoutEnvelope::sample(double t) const {
 
 CutoffEnvelope::CutoffEnvelope( double t0_, double t1_ ) :
     t0 ( t0_ ),
-    t1 ( t1_ )
+    t1 ( t1_ ),
+    t ( 0 )
 {
 }
 
-double CutoffEnvelope::sample(double t) const {
+double CutoffEnvelope::advance(double dt) {
+    t += dt;
+
     if( t < t0 || t > t1 ) return 0.0;
     return 1.0;
 }
