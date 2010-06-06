@@ -169,3 +169,44 @@ double ProductWave::advance(double dt) {
     }
     return rv;
 }
+
+SawtoothWave::SawtoothWave( double frequency_, double phase_ ) :
+    wavelength ( 1.0 / frequency_ ),
+    phase ( (phase_+0.25) * wavelength )
+{
+    advance(0);
+}
+
+double SawtoothWave::advance(double dt) {
+    const double halfwl = wavelength / 2.0;
+    phase += dt;
+    while(phase > wavelength) {
+        phase -= wavelength;
+    }
+    /* Descend, then ascend. (Note that we offset phase by .25
+     * to resemble a sine wave.) */
+    if( phase <= halfwl ) {
+        /* Descending phase. */
+        double t = phase / halfwl;
+        return 2.0 * t - 1.0;
+    } else {
+        double t = (phase-halfwl) / halfwl;
+        return (-2.0) * t + 1.0;
+    }
+}
+
+SquareWave::SquareWave(double frequency_, double phase_) :
+    wavelength( 1.0 / frequency_ ),
+    phase( phase * wavelength )
+{
+}
+
+double SquareWave::advance(double dt) {
+    const double halfwl = wavelength / 2.0;
+    phase += dt;
+    while(phase > wavelength) {
+        phase -= wavelength;
+    }
+    return (phase < halfwl) ? 1.0 : -1.0;
+}
+

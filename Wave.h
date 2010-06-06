@@ -126,4 +126,27 @@ class ExponentialFadeoutEnvelope : public WaveStream {
         double t;
 };
 
+class SawtoothWave : public WaveStream {
+    public:
+        SawtoothWave( double frequency,
+                      double phase = 0 );
+        
+        double advance(double);
+
+    private:
+        const double wavelength;
+        double phase;
+
+};
+
+class SquareWave : public WaveStream {
+    public:
+        SquareWave( double frequency,
+                    double phase = 0 );
+        double advance(double);
+    private:
+        const double wavelength;
+        double phase;
+};
+
 #endif

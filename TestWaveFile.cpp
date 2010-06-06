@@ -8,7 +8,7 @@ int main(int argc, char *argv[]) {
     (*tone440).add( new CutoffEnvelope( 0.0, 3.0 ) )
               .add( new ExponentialFadeoutEnvelope( 2.0 ) )
               .add( new SineEnvelope( 10.0, 0.8, 0.2 ) )
-              .add( new SineWave( 440.0 ) );
+              .add( new SquareWave( 440.0 ) );
 
 
     WaveFileExporter exporter = WaveFileExporter().setRate(44100)
