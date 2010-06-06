@@ -74,8 +74,8 @@ WaveFileExporter& WaveFileExporter::setSpan(double t0_, double t1_) {
     return *this;
 }
 
-WaveFileExporter& WaveFileExporter::setInput( AudioFunction const& input_ ) {
-    input = &input_;
+WaveFileExporter& WaveFileExporter::setInput( WaveStream* wave_ ) {
+    input = wave_;
     return *this;
 }
 
@@ -109,43 +109,31 @@ void WaveFileExporter::write() {
 
     const double uintAmp = (std::numeric_limits<uint16_t>::max() >> 1);
     const double dt = 1.0 / (double) sampleRate;
-    double t;
-    int i;
-    double multiplier = 1.0;
-    if( normalize ) {
-        t = t0;
-        i = 0;
-        multiplier = 0.0;
-        while( i < noSamples ) {
-            double value = fabs( input->sample( t ) );
-            if( value > multiplier ) {
-                multiplier = value;
-            }
-            i++;
-            t += dt;
-        }
-        multiplier = 1.0 / multiplier;
-
-    }
-    t = t0;
-    i = 0;
+    double t = t0;
+    int i = 0;
+    double max_abs = 0.0;
+    std::vector<double> samples;
     while( i < noSamples ) {
-        double value = input->sample( t ) * multiplier;
-        if( value > 1.0 ) {
-            value = 1.0;
-        } else if( value < -1.0 ) {
-            value = -1.0;
+        double x = input->advance( dt );
+        samples.push_back( x );
+        if( fabs(x) > max_abs ) {
+            max_abs = fabs(x);
         }
-        int16_t sample = static_cast<uint16_t>( uintAmp * (double) value );
-        writeInt16( sample );
-        if( fakeStereo ) {
-            writeInt16( sample );
-        }
-        t += dt;
         i++;
     }
-    
-
+    for(std::vector<double>::iterator i = samples.begin(); i != samples.end(); i++) {
+        double x = *i;
+        if( normalize ) {
+            x /= max_abs;
+        } else {
+            if( x > 1.0 ) x = 1.0;
+            if( x < -1.0 ) x = -1.0;
+        }
+        int16_t sample = static_cast<uint16_t>( uintAmp * x + 0.5);
+        for(int j=0;j<channels;j++) {
+            writeInt16( sample );
+        }
+    }
 }
 
 void WaveFileExporter::writeString(const std::string& s) {

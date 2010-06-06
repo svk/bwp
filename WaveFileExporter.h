@@ -17,7 +17,7 @@ class WaveFileExporter {
         WaveFileExporter& setOutputFilename(const std::string&);
         WaveFileExporter& setAdoptOutput(bool = true);
         WaveFileExporter& setSpan(double, double);
-        WaveFileExporter& setInput( AudioFunction const& );
+        WaveFileExporter& setInput( WaveStream* );
 
         void write();
         void close();
@@ -32,7 +32,7 @@ class WaveFileExporter {
         double t0, t1;
 
         bool closed;
-        AudioFunction const* input;
+        WaveStream *input;
 
         void writeString(const std::string&);
         void writeInt32(uint32_t);

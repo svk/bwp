@@ -3,19 +3,6 @@
 
 #include <vector>
 
-class AudioFunction {
-    /* A frequency-defining wave is generally a function R -> [-1,1].
-     * An envelope is a function R -> [0,1].
-     * These can be multiplied together to get a sound with a controlled volume.
-     * Waves can also be used in more creative ways, e.g. a wave that controls
-     *   the "immediate frequency" of another (pitch bending).
-     */
-    public:
-        virtual ~AudioFunction() {}
-
-        virtual double sample(double) const = 0;
-};
-
 class WaveStream {
     /* A wave stream replaces the concept of an audio function;
      *  crucially it is not an entire function. It cannot be
@@ -80,44 +67,39 @@ class PiecewiseLinearClosedSupport : public WaveStream {
         double t;
 };
 
-class SoundWave : public AudioFunction {
+class DelayedWave : public WaveStream {
     public:
-        SoundWave( const AudioFunction&, const AudioFunction& );
-        ~SoundWave();
+        DelayedWave( WaveStream*, double );
+        ~DelayedWave();
 
-        double sample(double t) const;
+        double advance(double t);
     private:
-        const AudioFunction& amplitude;
-        const AudioFunction& wave;
+        WaveStream *wave;
+        double delay;
 };
 
-class TranslatedWave : public AudioFunction {
-    public:
-        TranslatedWave( const AudioFunction&, double );
-        double sample(double t) const;
-    private:
-        const AudioFunction& wave;
-        double dt;
-};
-
-class SumWave : public AudioFunction {
+class SumWave : public WaveStream {
     public:
         SumWave();
-        SumWave& add(const AudioFunction&);
+        ~SumWave();
+
+        SumWave& add(WaveStream*);
     
-        double sample(double t) const;
+        double advance(double t);
     private:
-        std::vector<const AudioFunction *> waves;
+        std::vector<WaveStream*> waves;
 };
 
-class ProductWave : public AudioFunction {
+class ProductWave : public WaveStream {
     public:
         ProductWave();
-        ProductWave& add(const AudioFunction&);
+        ~ProductWave();
+
+        ProductWave& add(WaveStream*);
     
-        double sample(double t) const;
+        double advance(double t);
     private:
-        std::vector<const AudioFunction *> waves;
+        std::vector<WaveStream*> waves;
 };
 
 class CutoffEnvelope : public WaveStream {

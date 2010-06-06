@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <cassert>
 
 SineEnvelope::SineEnvelope( double frequency_,
                             double baseline_,
@@ -41,23 +42,6 @@ double SineWave::advance(double dt) {
     return sin( 2 * M_PI * (frequency * t + phase) );
 }
 
-SoundWave::SoundWave( const AudioFunction& amp_,
-                      const AudioFunction& sig_) :
-    amplitude ( amp_ ),
-    wave ( sig_ )
-{
-}
-
-SoundWave::~SoundWave() {
-}
-
-double SoundWave::sample(double t) const {
-    double a = amplitude.sample( t );
-    if( a != 0.0 ) {
-        return a * wave.sample( t );
-    }
-}
-
 PiecewiseLinearClosedSupport::~PiecewiseLinearClosedSupport() {
 }
 
@@ -93,54 +77,6 @@ double PiecewiseLinearClosedSupport::advance(double dt) {
     return 0.0;
 }
 
-TranslatedWave::TranslatedWave( const AudioFunction& wave_, double dt_ ) :
-    wave ( wave_ ),
-    dt ( dt_ )
-{
-}
-
-double TranslatedWave::sample(double t) const {
-    return wave.sample(t - dt);
-}
-
-SumWave::SumWave() :
-    waves ()
-{
-}
-
-SumWave& SumWave::add(const AudioFunction& wave) {
-    waves.push_back( &wave );
-    return *this;
-}
-
-double SumWave::sample( double t ) const {
-    double s = 0.0;
-    for(std::vector<AudioFunction const*>::const_iterator i = waves.begin(); i != waves.end(); i++) {
-        s += (*i)->sample( t );
-    }
-    return s;
-}
-
-ProductWave::ProductWave() :
-    waves ()
-{
-}
-
-ProductWave& ProductWave::add(const AudioFunction& wave) {
-    waves.push_back( &wave );
-    return *this;
-}
-
-double ProductWave::sample( double t ) const {
-    double s = 1.0;
-    for(std::vector<AudioFunction const*>::const_iterator i = waves.begin(); i != waves.end(); i++) {
-        double x = (*i)->sample( t );
-        if( x == 0.0 ) return 0.0;
-        s *= x;
-    }
-    return s;
-}
-
 ExponentialFadeoutEnvelope::ExponentialFadeoutEnvelope(double alpha_) :
     alpha ( alpha_ ),
     t ( 0 )
@@ -168,4 +104,68 @@ double CutoffEnvelope::advance(double dt) {
 
     if( t < t0 || t > t1 ) return 0.0;
     return 1.0;
+}
+
+DelayedWave::DelayedWave( WaveStream* wave_, double delay_ ) :
+    wave ( wave_ ),
+    delay ( delay_ )
+{
+}
+
+DelayedWave::~DelayedWave() {
+    delete wave;
+}
+
+double DelayedWave::advance(double dt) {
+    if( delay > dt ) {
+        delay -= dt;
+        return 0.0;
+    }
+    dt -= delay;
+    delay = 0.0;
+    return wave->advance( dt );
+}
+
+SumWave::SumWave() {
+}
+
+SumWave::~SumWave() {
+    for(std::vector<WaveStream*>::iterator i = waves.begin(); i != waves.end(); i++) {
+        delete *i;
+    }
+}
+
+SumWave& SumWave::add(WaveStream *wave) {
+    waves.push_back( wave );
+    return *this;
+}
+
+double SumWave::advance(double dt) {
+    double rv = 0.0;
+    for(std::vector<WaveStream*>::iterator i = waves.begin(); i != waves.end(); i++) {
+        rv += (*i)->advance( dt );
+    }
+    return rv;
+}
+
+ProductWave::ProductWave() {
+}
+
+ProductWave::~ProductWave() {
+    for(std::vector<WaveStream*>::iterator i = waves.begin(); i != waves.end(); i++) {
+        delete *i;
+    }
+}
+
+ProductWave& ProductWave::add(WaveStream *wave) {
+    waves.push_back( wave );
+    return *this;
+}
+
+double ProductWave::advance(double dt) {
+    double rv = 1.0;
+    for(std::vector<WaveStream*>::iterator i = waves.begin(); i != waves.end(); i++) {
+        rv *= (*i)->advance( dt );
+    }
+    return rv;
 }
