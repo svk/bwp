@@ -5,8 +5,17 @@ import Wavestream
 
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
+import Text.ParserCombinators.Parsec.Token
+import Text.ParserCombinators.Parsec.Language
 
-foobar x y = x + y
+langDef = emptyDef{ commentLine = "#",
+                    identLetter = alphaNum,
+                    opStart = oneOf "+*",
+                    identStart = letter,
+                    reservedOpNames = ["+", "*"],
+                    opLetter = oneOf "+*",
+                    reservedNames = [] }
+TokenParser{ naturalOrFloat = m_naturalOrFloat } = makeTokenParser langDef
 
 -- We'll start out with integer-based expressions
 -- evaluating to integers, then convert to tree
@@ -22,22 +31,38 @@ tableOperators = [
                   [Infix (do {string "+"; return SumWavestream} ) AssocLeft]
                  ]
 
-term = number <|> bracketed <?> "basic expression"
+term = constantStream <|> funcStream <|> bracketed <?> "basic expression"
 
-number :: Parser Wavestream
-number = do
-            ds <- many1 digit
-            return $ ConstantWavestream $ read ds
-         <?> "number"
+constantStream :: Parser Wavestream
+constantStream = do { ds <- m_naturalOrFloat;
+                      case ds of
+                        Left n -> return $ ConstantWavestream $ fromIntegral $ n
+                        Right x -> return $ ConstantWavestream $ x
+                    }
+                 <?> "constant stream"
+
+funcStream :: Parser Wavestream
+funcStream = do
+                name <- many1 letter;
+                char '{';
+                char '}';
+                return $ resolveFunc name
+
+resolveFunc :: String -> Wavestream
+resolveFunc name
+    | name == "sine" = (NormalWavestream normalSine 1.0 0.0)
+    | name == "sawtooth" = (NormalWavestream normalSawtooth 1.0 0.0)
+    | name == "square" = (NormalWavestream normalSquare 1.0 0.0)
 
 bracketed :: Parser Wavestream
 bracketed =     do {char '('; x <- expr; char ')'; return x;}
             <|> do {char '['; x <- expr; char ']'; return x;}
+            <?> "bracketed expression"
 
 operatorPlus = (+)
 
 main =
-    case (parse expr "" "2*3") of
+    case (parse expr "" "1+0.2*sine{}") of
         Left err -> do putStr "parse error at "
                        print err
         Right x -> debugShowWavestream x 200

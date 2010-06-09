@@ -1,4 +1,4 @@
-all: Parsing
+all: Parsing Wavestream
 
 clean:
 	rm -f *.o
@@ -6,4 +6,7 @@ clean:
 	rm -f *.exe
 
 Parsing:
+	ghc --make $@
+
+Wavestream:
 	ghc --make $@
