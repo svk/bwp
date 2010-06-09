@@ -1,3 +1,5 @@
+module Wavestream where
+
 -- The normal wave functions simply evaluate
 -- waves on [0,1], expected to be one whole
 -- cycle with f(0) = f(1).
@@ -16,27 +18,24 @@ normalSawtooth x | x >= 0.0 && x < 0.25 = 4 * x
                  | x >= 0.25 && x < 0.75 = 1 - 4 * (x-0.25)
                  | x >= 0.75 && x <= 1.0 = 4 * (x-0.75) - 1
 
-class Wavestream a where
-    sample :: a -> Double
-    advance :: Double -> a -> a
+data Wavestream = ConstantWavestream Double
+                | NormalWavestream (Double -> Double) Double Double
+                | SumWavestream Wavestream Wavestream
+                | ProductWavestream Wavestream Wavestream
 
-data WsConstant = ConstantWavestream Double
+sample :: Wavestream -> Double
+sample (ConstantWavestream z) = z
+sample (NormalWavestream f a t) = f t
+sample (SumWavestream a b) = (sample a) + (sample b)
+sample (ProductWavestream a b) = (sample a) * (sample b)
 
-instance Wavestream WsConstant where
-    sample (ConstantWavestream z) = z
-    advance dt a = a
-
--- NormalWavestream is used to convert a standard periodic
--- function to a wavestream. Note that the phase arg should
--- always be in [0,1].
-data WsNormal = NormalWavestream (Double -> Double) Double Double
-
-instance Wavestream WsNormal where
-    sample (NormalWavestream f a t) = f t
-    advance dt (NormalWavestream f a t) = NormalWavestream f a t'
-        where
-            t' = (t + a * dt) `Data.Fixed.mod'` 1.0
-
+advance :: Double -> Wavestream -> Wavestream
+advance dt a@(ConstantWavestream _) = a
+advance dt (NormalWavestream f a t) = NormalWavestream f a t'
+    where
+        t' = (t + a * dt) `Data.Fixed.mod'` 1.0
+advance dt (SumWavestream a b) = SumWavestream (advance dt a) (advance dt b)
+advance dt (ProductWavestream a b) = ProductWavestream (advance dt a) (advance dt b)
 
 debugShowWavestream x n
     | n > 0 = do
@@ -45,5 +44,5 @@ debugShowWavestream x n
     | n <= 0  = do
         putStrLn $ show $ sample $ x
 
-main = do
-    debugShowWavestream (NormalWavestream normalSine 1.0 0.0) 200
+-- main = do
+--    debugShowWavestream (NormalWavestream normalSine 1.0 0.0) 200

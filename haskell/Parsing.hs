@@ -1,6 +1,8 @@
 
 module Main where
 
+import Wavestream
+
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 
@@ -11,26 +13,31 @@ foobar x y = x + y
 -- structures to evaluate with delays.
 
 
-expr :: Parser Integer
+expr :: Parser Wavestream
 expr = buildExpressionParser tableOperators term
     <?> "expression"
 
 tableOperators = [
-                  [Infix (do {string "*"; return (*)} ) AssocLeft],
-                  [Infix (do {string "+"; return (+)} ) AssocLeft]
+                  [Infix (do {string "*"; return ProductWavestream} ) AssocLeft],
+                  [Infix (do {string "+"; return SumWavestream} ) AssocLeft]
                  ]
 
-term = number
-       <?> "basic expression"
+term = number <|> bracketed <?> "basic expression"
 
-number :: Parser Integer
+number :: Parser Wavestream
 number = do
             ds <- many1 digit
-            return $ read ds
+            return $ ConstantWavestream $ read ds
          <?> "number"
+
+bracketed :: Parser Wavestream
+bracketed =     do {char '('; x <- expr; char ')'; return x;}
+            <|> do {char '['; x <- expr; char ']'; return x;}
 
 operatorPlus = (+)
 
 main =
-    do
-        parseTest expr "4+4*3"
+    case (parse expr "" "2*3") of
+        Left err -> do putStr "parse error at "
+                       print err
+        Right x -> debugShowWavestream x 200
