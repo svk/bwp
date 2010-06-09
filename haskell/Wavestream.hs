@@ -19,7 +19,7 @@ normalSawtooth x | x >= 0.0 && x < 0.25 = 4 * x
                  | x >= 0.75 && x <= 1.0 = 4 * (x-0.75) - 1
 
 data Wavestream = ConstantWavestream Double
-                | NormalWavestream (Double -> Double) Double Double
+                | NormalWavestream (Double -> Double) Wavestream Double
                 | SumWavestream Wavestream Wavestream
                 | ProductWavestream Wavestream Wavestream
 
@@ -31,16 +31,17 @@ sample (ProductWavestream a b) = (sample a) * (sample b)
 
 advance :: Double -> Wavestream -> Wavestream
 advance dt a@(ConstantWavestream _) = a
-advance dt (NormalWavestream f a t) = NormalWavestream f a t'
+advance dt (NormalWavestream f a t) = NormalWavestream f a' t'
     where
-        t' = (t + a * dt) `Data.Fixed.mod'` 1.0
+        a' = (advance dt a)
+        t' = (t + (sample a) * dt) `Data.Fixed.mod'` 1.0
 advance dt (SumWavestream a b) = SumWavestream (advance dt a) (advance dt b)
 advance dt (ProductWavestream a b) = ProductWavestream (advance dt a) (advance dt b)
 
 debugShowWavestream x n
     | n > 0 = do
         putStrLn $ show $ sample $ x
-        debugShowWavestream (advance 0.01 x) (n-1)
+        debugShowWavestream (advance 0.001 x) (n-1)
     | n <= 0  = do
         putStrLn $ show $ sample $ x
 

@@ -15,7 +15,8 @@ langDef = emptyDef{ commentLine = "#",
                     reservedOpNames = ["+", "*"],
                     opLetter = oneOf "+*",
                     reservedNames = [] }
-TokenParser{ naturalOrFloat = m_naturalOrFloat } = makeTokenParser langDef
+TokenParser{ naturalOrFloat = m_naturalOrFloat,
+             commaSep = m_commaSep } = makeTokenParser langDef
 
 -- We'll start out with integer-based expressions
 -- evaluating to integers, then convert to tree
@@ -41,18 +42,39 @@ constantStream = do { ds <- m_naturalOrFloat;
                     }
                  <?> "constant stream"
 
+argumentList :: Parser [(String,Wavestream)]
+argumentList = m_commaSep argument
+
+argument :: Parser (String, Wavestream)
+argument = do
+                name <- many1 letter;
+                char '=';
+                val <- expr;
+                return (name,val);
+
+lookupArgument :: [(String,Wavestream)] -> String -> Either String Wavestream
+lookupArgument [] _ = Left "no such argument"
+lookupArgument ((a,v):x) k
+    | a == k = Right v
+    | otherwise = lookupArgument x k
+
 funcStream :: Parser Wavestream
 funcStream = do
                 name <- many1 letter;
                 char '{';
+                arglist <- argumentList
                 char '}';
-                return $ resolveFunc name
+                return $ resolveFunc name (lookupArgument arglist)
 
-resolveFunc :: String -> Wavestream
-resolveFunc name
-    | name == "sine" = (NormalWavestream normalSine 1.0 0.0)
-    | name == "sawtooth" = (NormalWavestream normalSawtooth 1.0 0.0)
-    | name == "square" = (NormalWavestream normalSquare 1.0 0.0)
+resolveFunc :: String -> (String->Either String Wavestream) -> Wavestream
+resolveFunc name arg
+    | name == "sine" = (NormalWavestream normalSine freq 0.0)
+    | name == "sawtooth" = (NormalWavestream normalSawtooth freq 0.0)
+    | name == "square" = (NormalWavestream normalSquare freq 0.0)
+        where
+            freq = case arg "freq" of
+                     Left _ -> ConstantWavestream 1.0
+                     Right y -> y
 
 bracketed :: Parser Wavestream
 bracketed =     do {char '('; x <- expr; char ')'; return x;}
@@ -62,7 +84,7 @@ bracketed =     do {char '('; x <- expr; char ')'; return x;}
 operatorPlus = (+)
 
 main =
-    case (parse expr "" "1+0.2*sine{}") of
+    case (parse expr "" "sine{freq=sine{freq=0.3}*9+10.0}") of
         Left err -> do putStr "parse error at "
                        print err
-        Right x -> debugShowWavestream x 200
+        Right x -> debugShowWavestream x 10000
