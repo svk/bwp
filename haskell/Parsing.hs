@@ -18,7 +18,9 @@ langDef = emptyDef{ commentLine = "#",
 TokenParser{ naturalOrFloat = m_naturalOrFloat,
              commaSep = m_commaSep,
              whiteSpace = m_whiteSpace,
-             reservedOp = m_reservedOp } = makeTokenParser langDef
+             reservedOp = m_reservedOp,
+             identifier = m_identifier,
+             symbol = m_symbol } = makeTokenParser langDef
 
 -- We'll start out with integer-based expressions
 -- evaluating to integers, then convert to tree
@@ -32,8 +34,8 @@ expr = buildExpressionParser tableOperators term
     <?> "expression"
 
 tableOperators = [
-                  [Infix (do {string "*"; return ProductWavestream} ) AssocLeft],
-                  [Infix (do {string "+"; return SumWavestream} ) AssocLeft]
+                  [Infix (do {m_reservedOp "*"; return ProductWavestream} ) AssocLeft],
+                  [Infix (do {m_reservedOp "+"; return SumWavestream} ) AssocLeft]
                  ]
 
 term = constantStream <|> try (funcStream) <|> namedWave <|> bracketed <?> "basic expression"
@@ -58,7 +60,7 @@ toDouble (Right x) = x
 
 namedWave :: GenParser Char WaveBindings Wavestream
 namedWave = do
-                s <- many1 letter;
+                s <- m_identifier;
                 st <- getState;
                 case (lookupBinding st s) of
                     Left msg -> fail msg
@@ -66,26 +68,26 @@ namedWave = do
 
 numberPair :: GenParser Char WaveBindings (Double, Double)
 numberPair = do
-                char '(';
+                m_symbol "(";
                 x <- m_naturalOrFloat;
-                char ',';
+                m_symbol ",";
                 y <- m_naturalOrFloat;
-                char ')';
+                m_symbol ")";
                 return (toDouble x, toDouble y)
 
 
 argument :: GenParser Char WaveBindings (String, ScriptType)
 argument = try (do
-                name <- many1 letter;
-                char '=';
+                name <- m_identifier;
+                m_symbol "=";
                 val <- expr;
                 return (name,WavestreamType val);)
            <|> do
-                name <- many1 letter;
-                char '=';
-                char '[';
+                name <- m_identifier;
+                m_symbol "=";
+                m_symbol "[";
                 valuelist <- m_commaSep numberPair;
-                char ']';
+                m_symbol "]";
                 return (name, PairListType valuelist)
 
 
@@ -106,10 +108,10 @@ lookupArgument ((a,v):x) k
 
 funcStream :: GenParser Char WaveBindings Wavestream
 funcStream = do
-                name <- many1 letter;
-                char '{';
+                name <- m_identifier;
+                m_symbol "{";
                 arglist <- argumentList
-                char '}';
+                m_symbol "}";
                 return $ resolveFunc name (lookupArgument arglist)
 
 resolveFunc :: String -> (String->Either String ScriptType) -> Wavestream
@@ -141,7 +143,11 @@ resolveFunc name arg
                     
 
 bracketed :: GenParser Char WaveBindings Wavestream
-bracketed =     do {char '('; x <- expr; char ')'; return x;}
+bracketed =     do
+                    m_symbol "(";
+                    x <- expr;
+                    m_symbol ")";
+                    return x;
             <?> "bracketed expression"
 
 operatorPlus = (+)
@@ -172,10 +178,10 @@ myctx = "alpha:sine{freq=10}*0.5+0.5;output:sine{freq=440}*alpha;"
 
 fullParser :: GenParser Char WaveBindings WaveBindings
 fullParser = m_whiteSpace >> many (do
-                x <- many1 letter;
-                char ':';
+                x <- m_identifier;
+                m_symbol ":";
                 y <- expr;
-                char ';';
+                m_symbol ";";
                 updateState (addBinding x y)
                 return (x,y))
 
