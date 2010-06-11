@@ -43,7 +43,15 @@ tableOperators = [
                   [Infix (do {m_reservedOp "+"; return opSum} ) AssocLeft]
                  ]
 
-term = constantStream <|> try (funcStream) <|> namedWave <|> bracketed <?> "basic expression"
+term = constantStream <|> try (funcStream) <|> namedWave <|> pairList <|> bracketed <?> "basic expression"
+
+pairList :: GenParser Char WaveBindings ScriptType
+pairList = do
+    m_symbol "[";
+    valuelist <- m_commaSep numberPair;
+    m_symbol "]";
+    return (PairListType valuelist)
+
 
 constantStream :: GenParser Char WaveBindings ScriptType
 constantStream = do { ds <- m_naturalOrFloat;
@@ -88,13 +96,6 @@ argument = try (do
                 m_symbol "=";
                 val <- expr;
                 return (name,val);)
-           <|> do
-                name <- m_identifier;
-                m_symbol "=";
-                m_symbol "[";
-                valuelist <- m_commaSep numberPair;
-                m_symbol "]";
-                return (name, PairListType valuelist)
 
 
 addBinding :: String -> ScriptType -> [(String,ScriptType)] -> [(String, ScriptType)]
