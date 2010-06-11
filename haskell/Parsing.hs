@@ -71,8 +71,13 @@ resolveFunc name arg
     | name == "sine" = (NormalWavestream normalSine freq 0.0)
     | name == "sawtooth" = (NormalWavestream normalSawtooth freq 0.0)
     | name == "square" = (NormalWavestream normalSquare freq 0.0)
+    | name == "expdecay" = (FadeoutWavestream (\x -> exp (-x)) speed 0.0 0.001)
+    | name == "lineardecay" = (FadeoutWavestream (\x -> 1 - x) speed 0.0 0.0)
         where
             freq = case arg "freq" of
+                     Left _ -> ConstantWavestream 1.0
+                     Right y -> y
+            speed = case arg "speed" of
                      Left _ -> ConstantWavestream 1.0
                      Right y -> y
 
@@ -83,8 +88,21 @@ bracketed =     do {char '('; x <- expr; char ')'; return x;}
 
 operatorPlus = (+)
 
+outputSample wave t = do
+    putStr $ show $ t
+    putStr $ " "
+    putStrLn $ show $ (sample wave)
+
+outputWavestreamFrom t wave dt maxTime
+    | (nil wave) || (t > maxTime) = outputSample wave t
+    | otherwise = do
+        outputSample wave t
+        outputWavestreamFrom (t + dt) (advance dt wave) dt maxTime
+
+outputWavestream = outputWavestreamFrom 0
+
 main =
-    case (parse expr "" "sine{freq=sine{freq=0.3}*9+10.0}") of
+    case (parse expr "" "sine{freq=sawtooth{freq=1.0}*100.0+440.0}*lineardecay{speed=1.0}") of
         Left err -> do putStr "parse error at "
                        print err
-        Right x -> debugShowWavestream x 10000
+        Right x -> outputWavestream x (1.0/44100.0) 3.0
