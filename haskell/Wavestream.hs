@@ -24,12 +24,15 @@ data Wavestream = ConstantWavestream Double
                 | FadeinWavestream (Double -> Double) Wavestream Double
                 | LinearInterpolationWavestream [(Double,Double)] Double Double
                 | SpeedShiftWavestream Wavestream Wavestream
+                | DelayedWavestream Wavestream Double
 
 sample :: Wavestream -> Double
 sample (ConstantWavestream z) = z
 sample (NormalWavestream f a t) = f t
 sample (SumWavestream a b) = (sample a) + (sample b)
 sample (ProductWavestream a b) = (sample a) * (sample b)
+sample (DelayedWavestream a 0.0) = (sample a)
+sample (DelayedWavestream _ _) = 0
 sample (FadeoutWavestream f a t e)
     | rv >= e = rv
     | otherwise = 0
@@ -61,6 +64,7 @@ advance dt (LinearInterpolationWavestream l@((duration,v1):dvs) t v0)
         t' = t + dt
 advance dt (LinearInterpolationWavestream [] t v0) = LinearInterpolationWavestream [] (t + dt) v0
 advance dt (SpeedShiftWavestream wave a) = SpeedShiftWavestream (advance (dt * (sample a)) wave) (advance dt a)
+advance dt (DelayedWavestream a b) = DelayedWavestream a (max 0.0 (b - dt))
 
 nil :: Wavestream -> Bool
 nil (ConstantWavestream z) = z == 0
@@ -69,6 +73,7 @@ nil (ProductWavestream a b) = (nil a) || (nil b)
 nil w@(FadeoutWavestream f a t e) = (sample w) == 0
 nil (LinearInterpolationWavestream [] _ v0) = v0 == 0
 nil (SpeedShiftWavestream wave _) = nil wave
+nil (DelayedWavestream wave 0.0) = nil wave
 nil _ = False
 
 debugShowWavestream x n

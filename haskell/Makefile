@@ -5,8 +5,11 @@ clean:
 	rm -f *.hi
 	rm -f *.exe
 
-Parsing:
+Sss: Wavestream WavWrite
 	ghc --make $@
 
 Wavestream:
+	ghc --make $@
+
+WavWrite:
 	ghc --make $@
