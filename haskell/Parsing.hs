@@ -9,9 +9,9 @@ import Text.ParserCombinators.Parsec.Token
 import Text.ParserCombinators.Parsec.Language
 
 langDef = emptyDef{ commentLine = "#",
-                    identLetter = alphaNum,
                     opStart = oneOf "+*",
-                    identStart = letter,
+                    identStart = letter <|> char '_',
+                    identLetter = alphaNum <|> char '_',
                     reservedOpNames = ["+", "*"],
                     opLetter = oneOf "+*",
                     reservedNames = [] }
@@ -71,8 +71,8 @@ resolveFunc name arg
     | name == "sine" = (NormalWavestream normalSine freq 0.0)
     | name == "sawtooth" = (NormalWavestream normalSawtooth freq 0.0)
     | name == "square" = (NormalWavestream normalSquare freq 0.0)
-    | name == "expdecay" = (FadeoutWavestream (\x -> exp (-x)) speed 0.0 0.001)
-    | name == "lineardecay" = (FadeoutWavestream (\x -> 1 - x) speed 0.0 0.0)
+    | name == "exp_decay" = (FadeoutWavestream (\x -> exp (-x)) speed 0.0 0.001)
+    | name == "linear_decay" = (FadeoutWavestream (\x -> 1 - x) speed 0.0 0.0)
         where
             freq = case arg "freq" of
                      Left _ -> ConstantWavestream 1.0
@@ -102,7 +102,7 @@ outputWavestreamFrom t wave dt maxTime
 outputWavestream = outputWavestreamFrom 0
 
 main =
-    case (parse expr "" "sine{freq=sawtooth{freq=1.0}*100.0+440.0}*expdecay{speed=3.0}*[0.3*sine{freq=40*lineardecay{speed=0.5}}+0.7]*lineardecay{speed=2.0}") of
+    case (parse expr "" "sine{freq=sawtooth{freq=1.0}*100.0+440.0}*exp_decay{speed=3.0}*[0.3*sine{freq=40*linear_decay{speed=0.5}}+0.7]*linear_decay{speed=2.0}") of
         Left err -> do putStr "parse error at "
                        print err
         Right x -> outputWavestream x (1.0/44100.0) 3.0
