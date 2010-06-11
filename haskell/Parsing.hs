@@ -3,6 +3,7 @@ module Main where
 
 import Wavestream
 import List
+import WavWrite
 
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
@@ -223,7 +224,12 @@ outputWavestreamFrom t wave dt maxTime
         outputSample wave t
         outputWavestreamFrom (t + dt) (advance dt wave) dt maxTime
 
+exportWavestreamFrom t wave dt maxTime
+    | (nil wave) || (t > maxTime) = []
+    | otherwise = ((sample wave):exportWavestreamFrom (t + dt) (advance dt wave) dt maxTime)
+
 outputWavestream = outputWavestreamFrom 0
+exportWavestream = exportWavestreamFrom 0
 
 coolsound = "sine{freq=triangular{freq=1.0}*100.0+440.0}*expdecay{speed=3.0}*(0.3*sine{freq=40*lineardecay{speed=0.5}}+0.7)*lineardecay{speed=2.0}"
 simplesound = "sine{freq=440}*linearinterpolation{data=[(0.1,1.0),(0.05,0.7),(0.2,0.7),(0.1,0.0)]}"
@@ -263,14 +269,18 @@ fullParser = m_whiteSpace >> many (do
                 updateState (addBinding x y)
                 return (x,y))
 
+exportFromFile :: String -> String -> IO (Either String [Double])
 exportFromFile wavename filename = do
     input <- readFile filename;
     case (runParser fullParser [] "" input) of
-        Left err -> do putStr "parse error at "
-                       print err
+        Left err -> return $ Left $ show err
         Right waves -> case (lookupBinding waves wavename) of
-            Right (WavestreamType wave) -> outputWavestream wave (1.0/44100.0) 3.0
-            Left err -> do putStr "no such wave or not a wave: "
-                           putStrLn wavename
+            Right (WavestreamType wave) -> return $ Right $ exportWavestream wave (1.0/44100.0) 3.0
+            Left err -> return $ Left wavename
 
-main = exportFromFile "output" "input.sss"
+main = do
+        result <- exportFromFile "output" "input.sss"
+        case result of
+            Left err -> do putStr "error: "
+                           putStrLn err
+            Right samples -> writeWav "output.wav" samples
