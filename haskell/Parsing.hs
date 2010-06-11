@@ -48,12 +48,33 @@ argumentList = m_commaSep argument
 data ScriptType = WavestreamType Wavestream
                   | PairListType [(Double,Double)]
 
+toDouble :: (Either Integer Double) -> Double
+toDouble (Left n) = fromIntegral n
+toDouble (Right x) = x
+
+numberPair :: Parser (Double, Double)
+numberPair = do
+                char '(';
+                x <- m_naturalOrFloat;
+                char ',';
+                y <- m_naturalOrFloat;
+                char ')';
+                return (toDouble x, toDouble y)
+
+
 argument :: Parser (String, ScriptType)
-argument = do
+argument = try (do
                 name <- many1 letter;
                 char '=';
                 val <- expr;
-                return (name,WavestreamType val);
+                return (name,WavestreamType val);)
+           <|> do
+                name <- many1 letter;
+                char '=';
+                char '[';
+                valuelist <- m_commaSep numberPair;
+                char ']';
+                return (name, PairListType valuelist)
 
 lookupArgument :: [(String,ScriptType)] -> String -> Either String ScriptType
 lookupArgument [] _ = Left "no such argument"
@@ -74,8 +95,9 @@ resolveFunc name arg
     | name == "sine" = (NormalWavestream normalSine freq 0.0)
     | name == "sawtooth" = (NormalWavestream normalSawtooth freq 0.0)
     | name == "square" = (NormalWavestream normalSquare freq 0.0)
-    | name == "exp_decay" = (FadeoutWavestream (\x -> exp (-x)) speed 0.0 0.001)
-    | name == "linear_decay" = (FadeoutWavestream (\x -> 1 - x) speed 0.0 0.0)
+    | name == "expdecay" = (FadeoutWavestream (\x -> exp (-x)) speed 0.0 0.001)
+    | name == "lineardecay" = (FadeoutWavestream (\x -> 1 - x) speed 0.0 0.0)
+    | name == "linearinterpolation" = (LinearInterpolationWavestream dataarg 0.0 initial)
         where
             freq = case arg "freq" of
                      Left _ -> ConstantWavestream 1.0
@@ -85,11 +107,18 @@ resolveFunc name arg
                      Left _ -> ConstantWavestream 1.0
                      Right (WavestreamType wave) -> wave
                      _ -> error "inappropriate type"
+            initial = case arg "initial" of
+                     Left _ -> 0.0
+                     Right (WavestreamType wave) -> (sample wave)
+                     _ -> error "inappropriate type"
+            dataarg = case arg "data" of
+                     Left _ -> error "expected data"
+                     Right (PairListType pairlist) -> pairlist
+                     _ -> error "inappropriate type"
                     
 
 bracketed :: Parser Wavestream
 bracketed =     do {char '('; x <- expr; char ')'; return x;}
-            <|> do {char '['; x <- expr; char ']'; return x;}
             <?> "bracketed expression"
 
 operatorPlus = (+)
@@ -107,8 +136,11 @@ outputWavestreamFrom t wave dt maxTime
 
 outputWavestream = outputWavestreamFrom 0
 
+coolsound = "sine{freq=sawtooth{freq=1.0}*100.0+440.0}*expdecay{speed=3.0}*(0.3*sine{freq=40*lineardecay{speed=0.5}}+0.7)*lineardecay{speed=2.0}"
+simplesound = "sine{freq=440}*linearinterpolation{data=[(0.1,1.0),(0.05,0.7),(0.2,0.7),(0.1,0.0)]}"
+
 main =
-    case (parse expr "" "sine{freq=sawtooth{freq=1.0}*100.0+440.0}*exp_decay{speed=3.0}*[0.3*sine{freq=40*linear_decay{speed=0.5}}+0.7]*linear_decay{speed=2.0}") of
+    case (parse expr "" simplesound) of
         Left err -> do putStr "parse error at "
                        print err
         Right x -> outputWavestream x (1.0/44100.0) 3.0
