@@ -18,6 +18,7 @@ langDef = emptyDef{ commentLine = "#",
                     reservedNames = [] }
 TokenParser{ naturalOrFloat = m_naturalOrFloat,
              commaSep = m_commaSep,
+             commaSep1 = m_commaSep1,
              whiteSpace = m_whiteSpace,
              reservedOp = m_reservedOp,
              identifier = m_identifier,
@@ -36,6 +37,7 @@ expr = buildExpressionParser tableOperators term
     <?> "expression"
 
 opProduct (WavestreamType a) (WavestreamType b) = WavestreamType $ ProductWavestream a b
+
 opSum (WavestreamType a) (WavestreamType b) = WavestreamType $ SumWavestream a b
 
 tableOperators = [
@@ -97,7 +99,6 @@ argument = try (do
                 val <- expr;
                 return (name,val);)
 
-
 addBinding :: String -> ScriptType -> [(String,ScriptType)] -> [(String, ScriptType)]
 addBinding s w l = ((s,w):l)
 
@@ -150,6 +151,26 @@ resolveFop [] x = x
 evaluateFop :: WaveFunctionPartial -> Either [String] Wavestream
 evaluateFop (WaveFunctionPartial f [] a) = Right $ f a
 evaluateFop (WaveFunctionPartial _ s _) = Left s
+
+-- last step is:
+--   we need to convert an incomplete expression, e.g.: an expression with some
+--   identifiers that _do not resolve_, to a partially applied function
+--
+--   so we need some sort of delayed evaluation
+--
+--   what do we do when we need a value that does not resolve?
+--      - we cannot perform the calculation
+--
+--   what sorts of values might not resolve?
+--      - this is legitimately illegal:
+--              sine{} * 0.5
+--      - must be:
+--              sine{freq=x} * 0.5
+--              x does not resolve (but we have forewarning)
+--
+--  this is where it'd have been handy if we were using abstract syntax trees..
+--  could we just save the text and parse it later?
+
 
 {-
 resolveFunc :: String -> (String->Either String ScriptType) -> Wavestream
@@ -215,12 +236,30 @@ usingctx = "sine{freq=440}*(mysine*0.5+0.5)*linearinterpolation{data=[(0.1,1.0),
 
 myctx = "alpha:sine{freq=10}*0.5+0.5;output:sine{freq=440}*alpha;"
 
+parseLater :: [String] -> WaveBindings -> [Char] -> ScriptType
+parseLater s b t = PartialWavestreamType $ WaveFunctionPartial (\a -> case (runParser expr (b++a) "" t) of
+                                                                           Right (WavestreamType x) -> x
+                                                                           _ -> error "error in delayed parse") s []
+
+bindingValue :: GenParser Char WaveBindings ScriptType
+bindingValue = do
+                    m_symbol ":";
+                    y <- expr;
+                    m_symbol ";";
+                    return y;
+               <|> do
+                    m_symbol "{";
+                    names <- m_commaSep1 m_identifier
+                    m_symbol "}";
+                    m_symbol ":";
+                    statenow <- getState
+                    unparsed <- manyTill anyChar (try (m_symbol ";"))
+                    return $ parseLater names statenow unparsed
+
 fullParser :: GenParser Char WaveBindings WaveBindings
 fullParser = m_whiteSpace >> many (do
                 x <- m_identifier;
-                m_symbol ":";
-                y <- expr;
-                m_symbol ";";
+                y <- bindingValue;
                 updateState (addBinding x y)
                 return (x,y))
 
