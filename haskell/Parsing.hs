@@ -179,10 +179,14 @@ fullParser = m_whiteSpace >> many (do
                 updateState (addBinding x y)
                 return (x,y))
 
-main =
-    case (runParser fullParser [] "" myctx) of
+exportFromFile wavename filename = do
+    input <- readFile filename;
+    case (runParser fullParser [] "" input) of
         Left err -> do putStr "parse error at "
                        print err
-        Right x -> case (lookupBinding x "output") of
-                        Left err -> do putStr "no output wave"
-                        Right wave -> outputWavestream wave (1.0/44100.0) 3.0
+        Right waves -> case (lookupBinding waves wavename) of
+            Left err -> do putStr "no such wave: "
+                           putStrLn wavename
+            Right wave -> outputWavestream wave (1.0/44100.0) 3.0
+
+main = exportFromFile "output" "input.sss"
