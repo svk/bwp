@@ -5,6 +5,8 @@ import Wavestream
 import List
 import WavWrite
 
+import System (getArgs)
+
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Token
@@ -276,11 +278,18 @@ exportFromFile wavename filename = do
         Left err -> return $ Left $ show err
         Right waves -> case (lookupBinding waves wavename) of
             Right (WavestreamType wave) -> return $ Right $ exportWavestream wave (1.0/44100.0) 3.0
-            Left err -> return $ Left wavename
+            Left err -> return $ Left ("no such wave: " ++ wavename)
 
 main = do
-        result <- exportFromFile "output" "input.sss"
-        case result of
-            Left err -> do putStr "error: "
-                           putStrLn err
-            Right samples -> writeWav "output.wav" samples
+        cmdargs <- getArgs
+        let inputFile = cmdargs !! 0
+            waveName = cmdargs !! 1
+            outputFile = cmdargs !! 2
+            in do putStrLn ("Writing wave \"" ++ waveName ++ "\" from file \"" ++ inputFile ++ "\" to WAV \"" ++ outputFile ++ "\".")
+                  result <- exportFromFile waveName inputFile
+                  case result of
+                      Left err -> do putStr "error: "
+                                     putStrLn err
+                      Right samples -> do putStrLn "Writing to WAV file."
+                                          writeWav outputFile samples
+                                          putStrLn "Done!"
