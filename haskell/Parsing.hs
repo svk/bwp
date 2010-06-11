@@ -42,17 +42,20 @@ constantStream = do { ds <- m_naturalOrFloat;
                     }
                  <?> "constant stream"
 
-argumentList :: Parser [(String,Wavestream)]
+argumentList :: Parser [(String,ScriptType)]
 argumentList = m_commaSep argument
 
-argument :: Parser (String, Wavestream)
+data ScriptType = WavestreamType Wavestream
+                  | PairListType [(Double,Double)]
+
+argument :: Parser (String, ScriptType)
 argument = do
                 name <- many1 letter;
                 char '=';
                 val <- expr;
-                return (name,val);
+                return (name,WavestreamType val);
 
-lookupArgument :: [(String,Wavestream)] -> String -> Either String Wavestream
+lookupArgument :: [(String,ScriptType)] -> String -> Either String ScriptType
 lookupArgument [] _ = Left "no such argument"
 lookupArgument ((a,v):x) k
     | a == k = Right v
@@ -66,7 +69,7 @@ funcStream = do
                 char '}';
                 return $ resolveFunc name (lookupArgument arglist)
 
-resolveFunc :: String -> (String->Either String Wavestream) -> Wavestream
+resolveFunc :: String -> (String->Either String ScriptType) -> Wavestream
 resolveFunc name arg
     | name == "sine" = (NormalWavestream normalSine freq 0.0)
     | name == "sawtooth" = (NormalWavestream normalSawtooth freq 0.0)
@@ -76,10 +79,13 @@ resolveFunc name arg
         where
             freq = case arg "freq" of
                      Left _ -> ConstantWavestream 1.0
-                     Right y -> y
+                     Right (WavestreamType wave) -> wave
+                     _ -> error "inappropriate type"
             speed = case arg "speed" of
                      Left _ -> ConstantWavestream 1.0
-                     Right y -> y
+                     Right (WavestreamType wave) -> wave
+                     _ -> error "inappropriate type"
+                    
 
 bracketed :: Parser Wavestream
 bracketed =     do {char '('; x <- expr; char ')'; return x;}
