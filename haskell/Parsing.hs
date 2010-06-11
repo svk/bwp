@@ -2,6 +2,7 @@
 module Main where
 
 import Wavestream
+import List
 
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
@@ -26,25 +27,29 @@ TokenParser{ naturalOrFloat = m_naturalOrFloat,
 -- evaluating to integers, then convert to tree
 -- structures to evaluate with delays.
 --
+--
 
-type WaveBindings = [(String,Wavestream)]
+type WaveBindings = [(String,ScriptType)]
 
-expr :: GenParser Char WaveBindings Wavestream
+expr :: GenParser Char WaveBindings ScriptType
 expr = buildExpressionParser tableOperators term
     <?> "expression"
 
+opProduct (WavestreamType a) (WavestreamType b) = WavestreamType $ ProductWavestream a b
+opSum (WavestreamType a) (WavestreamType b) = WavestreamType $ SumWavestream a b
+
 tableOperators = [
-                  [Infix (do {m_reservedOp "*"; return ProductWavestream} ) AssocLeft],
-                  [Infix (do {m_reservedOp "+"; return SumWavestream} ) AssocLeft]
+                  [Infix (do {m_reservedOp "*"; return opProduct} ) AssocLeft],
+                  [Infix (do {m_reservedOp "+"; return opSum} ) AssocLeft]
                  ]
 
 term = constantStream <|> try (funcStream) <|> namedWave <|> bracketed <?> "basic expression"
 
-constantStream :: GenParser Char WaveBindings Wavestream
+constantStream :: GenParser Char WaveBindings ScriptType
 constantStream = do { ds <- m_naturalOrFloat;
                       case ds of
-                        Left n -> return $ ConstantWavestream $ fromIntegral $ n
-                        Right x -> return $ ConstantWavestream $ x
+                        Left n -> return $ WavestreamType $ ConstantWavestream $ fromIntegral $ n
+                        Right x -> return $ WavestreamType $ ConstantWavestream $ x
                     }
                  <?> "constant stream"
 
@@ -53,18 +58,19 @@ argumentList = m_commaSep argument
 
 data ScriptType = WavestreamType Wavestream
                   | PairListType [(Double,Double)]
+                  | PartialWavestreamType [(String,ScriptType)] [String] WaveFunction
 
 toDouble :: (Either Integer Double) -> Double
 toDouble (Left n) = fromIntegral n
 toDouble (Right x) = x
 
-namedWave :: GenParser Char WaveBindings Wavestream
+namedWave :: GenParser Char WaveBindings ScriptType
 namedWave = do
                 s <- m_identifier;
                 st <- getState;
                 case (lookupBinding st s) of
                     Left msg -> fail msg
-                    Right wave -> return wave
+                    Right (WavestreamType wave) -> return (WavestreamType wave)
 
 numberPair :: GenParser Char WaveBindings (Double, Double)
 numberPair = do
@@ -81,7 +87,7 @@ argument = try (do
                 name <- m_identifier;
                 m_symbol "=";
                 val <- expr;
-                return (name,WavestreamType val);)
+                return (name,val);)
            <|> do
                 name <- m_identifier;
                 m_symbol "=";
@@ -91,10 +97,10 @@ argument = try (do
                 return (name, PairListType valuelist)
 
 
-addBinding :: String -> Wavestream -> [(String,Wavestream)] -> [(String, Wavestream)]
+addBinding :: String -> ScriptType -> [(String,ScriptType)] -> [(String, ScriptType)]
 addBinding s w l = ((s,w):l)
 
-lookupBinding :: [(String,Wavestream)] -> String -> Either String Wavestream
+lookupBinding :: [(String,ScriptType)] -> String -> Either String ScriptType
 lookupBinding [] _ = Left "no such binding"
 lookupBinding ((a,v):x) k
     | a == k = Right v
@@ -106,13 +112,35 @@ lookupArgument ((a,v):x) k
     | a == k = Right v
     | otherwise = lookupArgument x k
 
-funcStream :: GenParser Char WaveBindings Wavestream
+funcStream :: GenParser Char WaveBindings ScriptType
 funcStream = do
                 name <- m_identifier;
                 m_symbol "{";
                 arglist <- argumentList
                 m_symbol "}";
-                return $ resolveFunc name (lookupArgument arglist)
+                return $ WavestreamType $ resolveFunc name (lookupArgument arglist)
+
+
+type WaveFunction = [(String,ScriptType)] -> Wavestream
+data WaveFunctionPartial = WaveFunctionPartial WaveFunction [String] [(String,ScriptType)]
+
+builtinSine :: WaveFunction
+builtinSine a = NormalWavestream normalSine freq 0.0
+    where
+        freq = case (lookupArgument a "freq") of
+            Right (WavestreamType x) -> x
+            _ -> error "some sort of error, builtinSine.freq"
+
+resolveBuiltinFunc :: String -> WaveFunctionPartial
+resolveBuiltinFunc "sine" = WaveFunctionPartial builtinSine ["freq"] []
+
+resolveFop :: [(String,ScriptType)] -> WaveFunctionPartial -> WaveFunctionPartial
+resolveFop ((an,av):as) (WaveFunctionPartial f ua ra) = resolveFop as $ WaveFunctionPartial f (delete an ua) ((an,av):ra)
+resolveFop [] x = x
+
+evaluateFop :: WaveFunctionPartial -> Either [String] Wavestream
+evaluateFop (WaveFunctionPartial f [] a) = Right $ f a
+evaluateFop (WaveFunctionPartial _ s _) = Left s
 
 resolveFunc :: String -> (String->Either String ScriptType) -> Wavestream
 resolveFunc name arg
@@ -142,7 +170,7 @@ resolveFunc name arg
                      _ -> error "inappropriate type"
                     
 
-bracketed :: GenParser Char WaveBindings Wavestream
+bracketed :: GenParser Char WaveBindings ScriptType
 bracketed =     do
                     m_symbol "(";
                     x <- expr;
@@ -191,8 +219,8 @@ exportFromFile wavename filename = do
         Left err -> do putStr "parse error at "
                        print err
         Right waves -> case (lookupBinding waves wavename) of
-            Left err -> do putStr "no such wave: "
+            Right (WavestreamType wave) -> outputWavestream wave (1.0/44100.0) 3.0
+            Left err -> do putStr "no such wave or not a wave: "
                            putStrLn wavename
-            Right wave -> outputWavestream wave (1.0/44100.0) 3.0
 
 main = exportFromFile "output" "input.sss"
