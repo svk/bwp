@@ -94,6 +94,7 @@ resolveFunc :: String -> (String->Either String ScriptType) -> Wavestream
 resolveFunc name arg
     | name == "sine" = (NormalWavestream normalSine freq 0.0)
     | name == "sawtooth" = (NormalWavestream normalSawtooth freq 0.0)
+    | name == "triangular" = (SpeedShiftWavestream (LinearInterpolationWavestream (cycle [(0.25,1.0),(0.5,-1.0),(0.25,0.0)]) 0.0 0.0) freq)
     | name == "square" = (NormalWavestream normalSquare freq 0.0)
     | name == "expdecay" = (FadeoutWavestream (\x -> exp (-x)) speed 0.0 0.001)
     | name == "lineardecay" = (FadeoutWavestream (\x -> 1 - x) speed 0.0 0.0)
@@ -136,11 +137,12 @@ outputWavestreamFrom t wave dt maxTime
 
 outputWavestream = outputWavestreamFrom 0
 
-coolsound = "sine{freq=sawtooth{freq=1.0}*100.0+440.0}*expdecay{speed=3.0}*(0.3*sine{freq=40*lineardecay{speed=0.5}}+0.7)*lineardecay{speed=2.0}"
+coolsound = "sine{freq=triangular{freq=1.0}*100.0+440.0}*expdecay{speed=3.0}*(0.3*sine{freq=40*lineardecay{speed=0.5}}+0.7)*lineardecay{speed=2.0}"
 simplesound = "sine{freq=440}*linearinterpolation{data=[(0.1,1.0),(0.05,0.7),(0.2,0.7),(0.1,0.0)]}"
+coolsound' = "sine{freq=sawtooth{freq=1.0}*100.0+440.0}*expdecay{speed=3.0}*(0.3*sine{freq=40*lineardecay{speed=0.5}}+0.7)*lineardecay{speed=2.0}"
 
 main =
-    case (parse expr "" simplesound) of
+    case (parse expr "" coolsound') of
         Left err -> do putStr "parse error at "
                        print err
         Right x -> outputWavestream x (1.0/44100.0) 3.0

@@ -14,9 +14,7 @@ normalSquare x | x >= 0.0 && x < 0.5 = 1.0
                | x >= 0.5 && x <= 1.0 = 0.0
 
 normalSawtooth :: (Ord a, Floating a) => a -> a
-normalSawtooth x | x >= 0.0 && x < 0.25 = 4 * x
-                 | x >= 0.25 && x < 0.75 = 1 - 4 * (x-0.25)
-                 | x >= 0.75 && x <= 1.0 = 4 * (x-0.75) - 1
+normalSawtooth x = 2 * x
 
 data Wavestream = ConstantWavestream Double
                 | NormalWavestream (Double -> Double) Wavestream Double
@@ -25,6 +23,7 @@ data Wavestream = ConstantWavestream Double
                 | FadeoutWavestream (Double -> Double) Wavestream Double Double
                 | FadeinWavestream (Double -> Double) Wavestream Double
                 | LinearInterpolationWavestream [(Double,Double)] Double Double
+                | SpeedShiftWavestream Wavestream Wavestream
 
 sample :: Wavestream -> Double
 sample (ConstantWavestream z) = z
@@ -43,6 +42,7 @@ sample (FadeinWavestream f a t)
             rv = f t
 sample (LinearInterpolationWavestream ((duration,v1):_) t v0) = (t/duration) * (v1-v0) + v0
 sample (LinearInterpolationWavestream [] _ v0) = v0
+sample (SpeedShiftWavestream wave _) = sample wave
 
 advance :: Double -> Wavestream -> Wavestream
 advance dt a@(ConstantWavestream _) = a
@@ -60,6 +60,7 @@ advance dt (LinearInterpolationWavestream l@((duration,v1):dvs) t v0)
     where
         t' = t + dt
 advance dt (LinearInterpolationWavestream [] t v0) = LinearInterpolationWavestream [] (t + dt) v0
+advance dt (SpeedShiftWavestream wave a) = SpeedShiftWavestream (advance (dt * (sample a)) wave) (advance dt a)
 
 nil :: Wavestream -> Bool
 nil (ConstantWavestream z) = z == 0
@@ -67,6 +68,7 @@ nil (SumWavestream a b) = (nil a) && (nil b)
 nil (ProductWavestream a b) = (nil a) || (nil b)
 nil w@(FadeoutWavestream f a t e) = (sample w) == 0
 nil (LinearInterpolationWavestream [] _ v0) = v0 == 0
+nil (SpeedShiftWavestream wave _) = nil wave
 nil _ = False
 
 debugShowWavestream x n
