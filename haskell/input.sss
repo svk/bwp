@@ -1,6 +1,7 @@
-gamma{foo} : sine{freq=foo};
+gamma{foo} : sawtooth{freq=foo};
 
-alpha: (gamma{foo = 10} * 0.3) + 0.5;
+vibrato: sine{freq = 10};
 
-output: gamma{foo = 440}
-        * alpha;
+output: gamma{foo = vibrato * 100 + 440}
+        * (vibrato * 0.2 + 0.8)
+        * expdecay{speed = 3};

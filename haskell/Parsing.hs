@@ -40,8 +40,12 @@ expr = buildExpressionParser tableOperators term
     <?> "expression"
 
 opProduct (WavestreamType a) (WavestreamType b) = WavestreamType $ ProductWavestream a b
+opProduct (PartialWavestreamType (WaveFunctionPartial _ s _)) _ = error ("left argument to product missing arguments: " ++ show s)
+opProduct _ (PartialWavestreamType (WaveFunctionPartial _ s _)) = error ("right argument to product missing arguments: " ++ show s)
 
 opSum (WavestreamType a) (WavestreamType b) = WavestreamType $ SumWavestream a b
+opSum (PartialWavestreamType (WaveFunctionPartial _ s _)) _ = error ("left argument to sum missing arguments: " ++ show s)
+opSum _ (PartialWavestreamType (WaveFunctionPartial _ s _)) = error ("right argument to sum missing arguments: " ++ show s)
 
 tableOperators = [
                   [Infix (do {m_reservedOp "*"; return opProduct} ) AssocLeft],
@@ -106,7 +110,7 @@ addBinding :: String -> ScriptType -> [(String,ScriptType)] -> [(String, ScriptT
 addBinding s w l = ((s,w):l)
 
 lookupBinding :: [(String,ScriptType)] -> String -> Either String ScriptType
-lookupBinding [] _ = Left "no such binding"
+lookupBinding [] s = Left ("no such binding: " ++ s)
 lookupBinding ((a,v):x) k
     | a == k = Right v
     | otherwise = lookupBinding x k
@@ -134,15 +138,26 @@ funcStream = do
 type WaveFunction = [(String,ScriptType)] -> Wavestream
 data WaveFunctionPartial = WaveFunctionPartial WaveFunction [String] [(String,ScriptType)]
 
-builtinSine :: WaveFunction
-builtinSine a = NormalWavestream normalSine freq 0.0
-    where
-        freq = case (lookupArgument a "freq") of
-            Right (WavestreamType x) -> x
-            _ -> error "some sort of error, builtinSine.freq"
+wsArg :: [(String,ScriptType)] -> String -> Wavestream
+wsArg ((n,(WavestreamType v)):nvs) s
+    | n == s = v
+    | otherwise = wsArg nvs s
+wsArg [] s = error ("no such argument: " ++ s)
+
+daArg :: [(String,ScriptType)] -> String -> [(Double,Double)]
+daArg ((n,(PairListType v)):nvs) s
+    | n == s = v
+    | otherwise = daArg nvs s
+daArg [] s = error ("no such argument: " ++ s)
 
 findFunc :: String -> WaveBindings -> Either String WaveFunctionPartial
-findFunc "sine" _ = Right $ WaveFunctionPartial builtinSine ["freq"] []
+findFunc "sine" _ = Right $ WaveFunctionPartial (\a -> NormalWavestream normalSine (wsArg a "freq") 0.0) ["freq"] []
+findFunc "sawtooth" _ = Right $ WaveFunctionPartial (\a -> NormalWavestream normalSawtooth (wsArg a "freq") 0.0) ["freq"] []
+findFunc "triangular" _ = Right $ WaveFunctionPartial (\a -> (SpeedShiftWavestream (LinearInterpolationWavestream (cycle [(0.25,1.0),(0.5,-1.0),(0.25,0.0)]) 0.0 0.0) (wsArg a "freq"))) ["freq"] []
+findFunc "square" _ = Right $ WaveFunctionPartial (\a -> NormalWavestream normalSquare (wsArg a "freq") 0.0) ["freq"] []
+findFunc "expdecay" _ = Right $ WaveFunctionPartial (\a -> (FadeoutWavestream (\x -> exp (-x)) (wsArg a "speed") 0.0 0.001)) ["speed"] []
+findFunc "lineardecay" _ = Right $ WaveFunctionPartial (\a -> (FadeoutWavestream (\x -> 1 - x) (wsArg a "speed") 0.0 0.0)) ["speed"] []
+findFunc "linearinterpolation" _ = Right $ WaveFunctionPartial (\a -> (LinearInterpolationWavestream (daArg a "data") 0.0 (sample (wsArg a "initial")))) ["data", "initial"] []
 findFunc name bindings = case (lookupBinding bindings name) of
                             Right (PartialWavestreamType x) -> Right x
                             _ -> Left name
@@ -154,26 +169,6 @@ resolveFop [] x = x
 evaluateFop :: WaveFunctionPartial -> Either [String] Wavestream
 evaluateFop (WaveFunctionPartial f [] a) = Right $ f a
 evaluateFop (WaveFunctionPartial _ s _) = Left s
-
--- last step is:
---   we need to convert an incomplete expression, e.g.: an expression with some
---   identifiers that _do not resolve_, to a partially applied function
---
---   so we need some sort of delayed evaluation
---
---   what do we do when we need a value that does not resolve?
---      - we cannot perform the calculation
---
---   what sorts of values might not resolve?
---      - this is legitimately illegal:
---              sine{} * 0.5
---      - must be:
---              sine{freq=x} * 0.5
---              x does not resolve (but we have forewarning)
---
---  this is where it'd have been handy if we were using abstract syntax trees..
---  could we just save the text and parse it later?
-
 
 {-
 resolveFunc :: String -> (String->Either String ScriptType) -> Wavestream
@@ -271,13 +266,13 @@ fullParser = m_whiteSpace >> many (do
                 updateState (addBinding x y)
                 return (x,y))
 
-exportFromFile :: String -> String -> IO (Either String [Double])
-exportFromFile wavename filename = do
+exportFromFile :: String -> String -> Integer -> Double -> IO (Either String [Double])
+exportFromFile wavename filename samplerate maxtime = do
     input <- readFile filename;
     case (runParser fullParser [] "" input) of
         Left err -> return $ Left $ show err
         Right waves -> case (lookupBinding waves wavename) of
-            Right (WavestreamType wave) -> return $ Right $ exportWavestream wave (1.0/44100.0) 3.0
+            Right (WavestreamType wave) -> return $ Right $ exportWavestream wave (1.0/(fromIntegral samplerate)) maxtime
             Left err -> return $ Left ("no such wave: " ++ wavename)
 
 main = do
@@ -285,8 +280,12 @@ main = do
         let inputFile = cmdargs !! 0
             waveName = cmdargs !! 1
             outputFile = cmdargs !! 2
+            maxtime = 3.0
+            samplerate = 44100
             in do putStrLn ("Writing wave \"" ++ waveName ++ "\" from file \"" ++ inputFile ++ "\" to WAV \"" ++ outputFile ++ "\".")
-                  result <- exportFromFile waveName inputFile
+                  putStrLn ("Sample rate: " ++ show samplerate)
+                  putStrLn ("Maximum duration: " ++ (show maxtime) ++ " seconds")
+                  result <- exportFromFile waveName inputFile samplerate maxtime
                   case result of
                       Left err -> do putStr "error: "
                                      putStrLn err

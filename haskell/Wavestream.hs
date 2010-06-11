@@ -14,7 +14,7 @@ normalSquare x | x >= 0.0 && x < 0.5 = 1.0
                | x >= 0.5 && x <= 1.0 = 0.0
 
 normalSawtooth :: (Ord a, Floating a) => a -> a
-normalSawtooth x = 2 * x
+normalSawtooth x = 2 * x - 1
 
 data Wavestream = ConstantWavestream Double
                 | NormalWavestream (Double -> Double) Wavestream Double
