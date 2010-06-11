@@ -58,7 +58,7 @@ argumentList = m_commaSep argument
 
 data ScriptType = WavestreamType Wavestream
                   | PairListType [(Double,Double)]
-                  | PartialWavestreamType [(String,ScriptType)] [String] WaveFunction
+                  | PartialWavestreamType WaveFunctionPartial
 
 toDouble :: (Either Integer Double) -> Double
 toDouble (Left n) = fromIntegral n
@@ -118,8 +118,13 @@ funcStream = do
                 m_symbol "{";
                 arglist <- argumentList
                 m_symbol "}";
-                return $ WavestreamType $ resolveFunc name (lookupArgument arglist)
-
+                st <- getState
+                case (findFunc name st) of
+                    Left s -> fail s
+                    Right x ->
+                        case (evaluateFop $ resolveFop arglist x) of
+                            Left _ -> return (PartialWavestreamType x)
+                            Right result -> return (WavestreamType result)
 
 type WaveFunction = [(String,ScriptType)] -> Wavestream
 data WaveFunctionPartial = WaveFunctionPartial WaveFunction [String] [(String,ScriptType)]
@@ -131,8 +136,11 @@ builtinSine a = NormalWavestream normalSine freq 0.0
             Right (WavestreamType x) -> x
             _ -> error "some sort of error, builtinSine.freq"
 
-resolveBuiltinFunc :: String -> WaveFunctionPartial
-resolveBuiltinFunc "sine" = WaveFunctionPartial builtinSine ["freq"] []
+findFunc :: String -> WaveBindings -> Either String WaveFunctionPartial
+findFunc "sine" _ = Right $ WaveFunctionPartial builtinSine ["freq"] []
+findFunc name bindings = case (lookupBinding bindings name) of
+                            Right (PartialWavestreamType x) -> Right x
+                            _ -> Left name
 
 resolveFop :: [(String,ScriptType)] -> WaveFunctionPartial -> WaveFunctionPartial
 resolveFop ((an,av):as) (WaveFunctionPartial f ua ra) = resolveFop as $ WaveFunctionPartial f (delete an ua) ((an,av):ra)
@@ -142,6 +150,7 @@ evaluateFop :: WaveFunctionPartial -> Either [String] Wavestream
 evaluateFop (WaveFunctionPartial f [] a) = Right $ f a
 evaluateFop (WaveFunctionPartial _ s _) = Left s
 
+{-
 resolveFunc :: String -> (String->Either String ScriptType) -> Wavestream
 resolveFunc name arg
     | name == "sine" = (NormalWavestream normalSine freq 0.0)
@@ -168,6 +177,7 @@ resolveFunc name arg
                      Left _ -> error "expected data"
                      Right (PairListType pairlist) -> pairlist
                      _ -> error "inappropriate type"
+-}
                     
 
 bracketed :: GenParser Char WaveBindings ScriptType
