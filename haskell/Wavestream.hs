@@ -24,7 +24,7 @@ data Wavestream = ConstantWavestream Double
                 | ProductWavestream Wavestream Wavestream
                 | FadeoutWavestream (Double -> Double) Wavestream Double Double
                 | FadeinWavestream (Double -> Double) Wavestream Double
-                | LinearInterpolationWavestream [(Double,Double)] Double
+                | LinearInterpolationWavestream [(Double,Double)] Double Double
 
 sample :: Wavestream -> Double
 sample (ConstantWavestream z) = z
@@ -41,8 +41,8 @@ sample (FadeinWavestream f a t)
     | otherwise = 1
         where
             rv = f t
-sample (LinearInterpolationWavestream ((t0,v0):(t1,v1):_) t) = (t-t0)*(v1-v0)/(t1-t0) + v0
-sample (LinearInterpolationWavestream _ _) = 0
+sample (LinearInterpolationWavestream ((duration,v1):_) t v0) = (t/duration) * (v1-v0) + v0
+sample (LinearInterpolationWavestream [] _ v0) = v0
 
 advance :: Double -> Wavestream -> Wavestream
 advance dt a@(ConstantWavestream _) = a
@@ -54,20 +54,19 @@ advance dt (SumWavestream a b) = SumWavestream (advance dt a) (advance dt b)
 advance dt (ProductWavestream a b) = ProductWavestream (advance dt a) (advance dt b)
 advance dt (FadeoutWavestream f a t e) = FadeoutWavestream f (advance dt a) (t + (sample a) * dt) e
 advance dt (FadeinWavestream f a t) = FadeinWavestream f (advance dt a) (t + (sample a) * dt)
-advance dt (LinearInterpolationWavestream ((ti,v):(ti',v'):tivs) t)
-    | t' < ti' = LinearInterpolationWavestream ((ti,v):(ti',v'):tivs) t'
-    | otherwise = advance dt (LinearInterpolationWavestream ((ti',v'):tivs) t)
-        where
-            t' = t + dt
-advance dt (LinearInterpolationWavestream _ t) = LinearInterpolationWavestream [] (t + dt)
+advance dt (LinearInterpolationWavestream l@((duration,v1):dvs) t v0)
+    | t' >= duration = advance (t' - duration) (LinearInterpolationWavestream dvs 0.0 v1)
+    | otherwise = LinearInterpolationWavestream l t' v0
+    where
+        t' = t + dt
+advance dt (LinearInterpolationWavestream [] t v0) = LinearInterpolationWavestream [] (t + dt) v0
 
 nil :: Wavestream -> Bool
 nil (ConstantWavestream z) = z == 0
 nil (SumWavestream a b) = (nil a) && (nil b)
 nil (ProductWavestream a b) = (nil a) || (nil b)
 nil w@(FadeoutWavestream f a t e) = (sample w) == 0
-nil (LinearInterpolationWavestream ((t0,v0):(t1,v1):_) t) = False
-nil (LinearInterpolationWavestream ((t0,v0):[]) t) = True
+nil (LinearInterpolationWavestream [] _ v0) = v0 == 0
 nil _ = False
 
 debugShowWavestream x n
@@ -78,4 +77,4 @@ debugShowWavestream x n
         putStrLn $ show $ sample $ x
 
 main = do
-    debugShowWavestream (LinearInterpolationWavestream [(0.0, 0.0), (0.5, 1.0), (0.75, 0.25), (1.5, 0.25), (2.0, 0.0), (3.0, 1.0), (3.1, 0.0)] 0.0) 400
+    debugShowWavestream (LinearInterpolationWavestream [(0.5, 1.0), (0.25, 0.25), (0.75, 0.25), (0.5, 0.0), (1.0, 1.0), (0.1, -0.5)] 0.0 0.0) 2000
