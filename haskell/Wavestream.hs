@@ -1,4 +1,4 @@
-module Main where
+module Wavestream where
 
 -- The normal wave functions simply evaluate
 -- waves on [0,1], expected to be one whole
@@ -76,5 +76,5 @@ debugShowWavestream x n
     | n <= 0  = do
         putStrLn $ show $ sample $ x
 
-main = do
-    debugShowWavestream (LinearInterpolationWavestream [(0.5, 1.0), (0.25, 0.25), (0.75, 0.25), (0.5, 0.0), (1.0, 1.0), (0.1, -0.5)] 0.0 0.0) 2000
+--main = do
+--    debugShowWavestream (LinearInterpolationWavestream [(0.5, 1.0), (0.25, 0.25), (0.75, 0.25), (0.5, 0.0), (1.0, 1.0), (0.1, -0.5)] 0.0 0.0) 2000
