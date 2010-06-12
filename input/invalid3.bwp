@@ -1,0 +1,3 @@
+# not declaring an argument
+foo{alpha}: alpha + beta;
+output: foo{alpha=2};
