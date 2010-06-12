@@ -4,6 +4,7 @@ import Wavestream
 import List
 import WavWrite
 import System.Random
+import Data.Maybe
 
 import System (getArgs)
 
@@ -55,7 +56,7 @@ tableOperators = [
                   [Infix (do {m_reservedOp "-"; return opMinus} ) AssocLeft]
                  ]
 
-term = constantStream <|> try (funcStream) <|> namedWave <|> pairList <|> bracketed <?> "basic expression"
+term = constantStream <|> try (namedWave) <|> funcStream <|> pairList <|> bracketed <?> "basic expression"
 
 pairList :: GenParser Char WaveBindings ScriptType
 pairList = do
@@ -133,11 +134,13 @@ funcStream = do
                 m_symbol "}";
                 st <- getState
                 case (findFunc name st) of
-                    Left s -> fail ("looking up funcstream: " ++ s)
+                    Left s -> fail ("no such function: " ++ name)
                     Right x ->
-                        case (evaluateFop $ resolveFop arglist x) of
-                            Left _ -> return (PartialWavestreamType x)
-                            Right result -> return (WavestreamType result)
+                        case (resolveFop arglist x) of
+                            Left err -> fail ("resolving function " ++ name ++ ": " ++ err)
+                            Right f -> case (evaluateFop f) of
+                                            Nothing -> return (PartialWavestreamType x)
+                                            Just result -> return (WavestreamType result)
 
 type WaveFunction = [(String,ScriptType)] -> Wavestream
 data WaveFunctionPartial = WaveFunctionPartial WaveFunction [String] [(String,ScriptType)]
@@ -178,13 +181,19 @@ findFunc name bindings = case (lookupBinding bindings name) of
                             Right (PartialWavestreamType x) -> Right x
                             _ -> Left name
 
-resolveFop :: [(String,ScriptType)] -> WaveFunctionPartial -> WaveFunctionPartial
-resolveFop ((an,av):as) (WaveFunctionPartial f ua ra) = resolveFop as $ WaveFunctionPartial f (delete an ua) ((an,av):ra)
-resolveFop [] x = x
+resolveFop :: [(String,ScriptType)] -> WaveFunctionPartial -> Either String WaveFunctionPartial
+resolveFop ((an,av):as) (WaveFunctionPartial f ua ra)
+    | isJust argAlready = Left ("argument applied twice: " ++ an)
+    | isNothing argAppropriate = Left ("unknown argument: " ++ an)
+    | otherwise = resolveFop as $ WaveFunctionPartial f (delete an ua) ((an,av):ra)
+    where
+        argAlready = find ((==an).fst) ra
+        argAppropriate = find ((==an)) ua
+resolveFop [] x = Right x
 
-evaluateFop :: WaveFunctionPartial -> Either [String] Wavestream
-evaluateFop (WaveFunctionPartial f [] a) = Right $ f a
-evaluateFop (WaveFunctionPartial _ s _) = Left s
+evaluateFop :: WaveFunctionPartial -> Maybe Wavestream
+evaluateFop (WaveFunctionPartial f [] a) = Just $ f a
+evaluateFop (WaveFunctionPartial _ _ _) = Nothing
 
 bracketed :: GenParser Char WaveBindings ScriptType
 bracketed =     do
