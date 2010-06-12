@@ -1,4 +1,3 @@
-
 module Main where
 
 import Wavestream
@@ -159,10 +158,15 @@ findFunc "sawtooth" _ = Right $ WaveFunctionPartial (\a -> NormalWavestream norm
 findFunc "triangular" _ = Right $ WaveFunctionPartial (\a -> (SpeedShiftWavestream (LinearInterpolationWavestream (cycle [(0.25,1.0),(0.5,-1.0),(0.25,0.0)]) 0.0 0.0) (wsArg a "freq"))) ["freq"] []
 findFunc "square" _ = Right $ WaveFunctionPartial (\a -> NormalWavestream normalSquare (wsArg a "freq") 0.0) ["freq"] []
 findFunc "expdecay" _ = Right $ WaveFunctionPartial (\a -> (FadeoutWavestream (\x -> exp (-x)) (wsArg a "speed") 0.0 0.001)) ["speed"] []
+findFunc "exp_decay" _ = findFunc "expdecay" []
 findFunc "lineardecay" _ = Right $ WaveFunctionPartial (\a -> (FadeoutWavestream (\x -> 1 - x) (wsArg a "speed") 0.0 0.0)) ["speed"] []
+findFunc "linear_decay" _ = findFunc "lineardecay" []
 findFunc "linearinterpolation" _ = Right $ WaveFunctionPartial (\a -> (LinearInterpolationWavestream (daArg a "data") 0.0 (sample (wsArg a "initial")))) ["data", "initial"] []
+findFunc "linear_interpolation" _ = findFunc "linearinterpolation" []
 findFunc "phaseshift" _ = Right $ WaveFunctionPartial (\a -> (advance (sample (wsArg a "shift")) (wsArg a "wave"))) ["shift", "wave"] []
+findFunc "phase_shift" _ = findFunc "phaseshift" []
 findFunc "speedshift" _ = Right $ WaveFunctionPartial (\a -> (SpeedShiftWavestream (wsArg a "wave") (wsArg a "speed"))) ["speed", "wave"] []
+findFunc "speed_shift" _ = findFunc "speedshift" []
 findFunc "delay" _ = Right $ WaveFunctionPartial (\a -> DelayedWavestream (wsArg a "wave") (sample (wsArg a "delay"))) ["delay", "wave"] []
 findFunc name bindings = case (lookupBinding bindings name) of
                             Right (PartialWavestreamType x) -> Right x
