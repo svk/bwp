@@ -63,6 +63,10 @@ Language:
 
         random{seed,min,max}
 
+    The easiest way to get a feel for the language is probably to
+    look through the examples in the "input" directory that should
+    be distributed along with bwp.
+
 Tool usage:
     The bwp tool is used to "export" names that are bound to waves
     to .wav files. This is generally done with:
