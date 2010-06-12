@@ -235,6 +235,47 @@ parseLater s b t = PartialWavestreamType $ WaveFunctionPartial (\a -> case (runP
                                                                            Right (WavestreamType x) -> x
                                                                            _ -> error "error in delayed parse") s []
 
+-- the following is a bit sickening (code duplication)
+checkParseExpr :: GenParser Char WaveBindings [String]
+checkParseExpr = buildExpressionParser tableOperatorsCheck termCheck
+
+tableOperatorsCheck = [
+                  [Prefix (do {m_reservedOp "-"; return id} )],
+                  [Infix (do {m_reservedOp "*"; return union} ) AssocLeft],
+                  [Infix (do {m_reservedOp "+"; return union} ) AssocLeft],
+                  [Infix (do {m_reservedOp "-"; return union} ) AssocLeft]
+                 ]
+
+termCheck = do
+                x <- constantStream;
+                return []
+            <|> try (do
+                    s <- m_identifier;
+                    st <- getState;
+                    notFollowedBy $ m_symbol "{";
+                    case (lookupBinding st s) of
+                        Left msg -> return [s]
+                        Right z -> return []
+                )
+            <|> do
+                    s <- m_identifier;
+                    m_symbol "{";
+                    arglist <- m_commaSep (do
+                            n <- m_identifier;
+                            m_symbol "=";
+                            v <- checkParseExpr;
+                            return v;)
+                    m_symbol "}";
+                    return $ foldl union [] arglist
+            <|> do
+                    x <- pairList;
+                    return []
+            <|> do
+                    m_symbol "(";
+                    x <- checkParseExpr;
+                    m_symbol ")";
+                    return x;
+
 bindingValue :: GenParser Char WaveBindings ScriptType
 bindingValue = do
                     m_symbol ":";
@@ -248,7 +289,11 @@ bindingValue = do
                     m_symbol ":";
                     statenow <- getState
                     unparsed <- manyTill anyChar (try (m_symbol ";"))
-                    return $ parseLater names statenow unparsed
+                    case (runParser checkParseExpr statenow "" unparsed) of
+                        Left err -> fail $ show err
+                        Right vals -> case (vals \\ names) of
+                                            [] -> return $ parseLater names statenow unparsed
+                                            _ -> fail ("unresolved names: " ++ (show (vals \\ names)))
 
 fullParser :: GenParser Char WaveBindings WaveBindings
 fullParser = m_whiteSpace >> many (do
