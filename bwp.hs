@@ -26,12 +26,6 @@ TokenParser{ naturalOrFloat = m_naturalOrFloat,
              identifier = m_identifier,
              symbol = m_symbol } = makeTokenParser langDef
 
--- We'll start out with integer-based expressions
--- evaluating to integers, then convert to tree
--- structures to evaluate with delays.
---
---
-
 type WaveBindings = [(String,ScriptType)]
 
 expr :: GenParser Char WaveBindings ScriptType
@@ -180,36 +174,6 @@ evaluateFop :: WaveFunctionPartial -> Either [String] Wavestream
 evaluateFop (WaveFunctionPartial f [] a) = Right $ f a
 evaluateFop (WaveFunctionPartial _ s _) = Left s
 
-{-
-resolveFunc :: String -> (String->Either String ScriptType) -> Wavestream
-resolveFunc name arg
-    | name == "sine" = (NormalWavestream normalSine freq 0.0)
-    | name == "sawtooth" = (NormalWavestream normalSawtooth freq 0.0)
-    | name == "triangular" = (SpeedShiftWavestream (LinearInterpolationWavestream (cycle [(0.25,1.0),(0.5,-1.0),(0.25,0.0)]) 0.0 0.0) freq)
-    | name == "square" = (NormalWavestream normalSquare freq 0.0)
-    | name == "expdecay" = (FadeoutWavestream (\x -> exp (-x)) speed 0.0 0.001)
-    | name == "lineardecay" = (FadeoutWavestream (\x -> 1 - x) speed 0.0 0.0)
-    | name == "linearinterpolation" = (LinearInterpolationWavestream dataarg 0.0 initial)
-        where
-            freq = case arg "freq" of
-                     Left _ -> ConstantWavestream 1.0
-                     Right (WavestreamType wave) -> wave
-                     _ -> error "inappropriate type"
-            speed = case arg "speed" of
-                     Left _ -> ConstantWavestream 1.0
-                     Right (WavestreamType wave) -> wave
-                     _ -> error "inappropriate type"
-            initial = case arg "initial" of
-                     Left _ -> 0.0
-                     Right (WavestreamType wave) -> (sample wave)
-                     _ -> error "inappropriate type"
-            dataarg = case arg "data" of
-                     Left _ -> error "expected data"
-                     Right (PairListType pairlist) -> pairlist
-                     _ -> error "inappropriate type"
--}
-                    
-
 bracketed :: GenParser Char WaveBindings ScriptType
 bracketed =     do
                     m_symbol "(";
@@ -237,17 +201,6 @@ exportWavestreamFrom t wave dt maxTime
 
 outputWavestream = outputWavestreamFrom 0
 exportWavestream = exportWavestreamFrom 0
-
-coolsound = "sine{freq=triangular{freq=1.0}*100.0+440.0}*expdecay{speed=3.0}*(0.3*sine{freq=40*lineardecay{speed=0.5}}+0.7)*lineardecay{speed=2.0}"
-simplesound = "sine{freq=440}*linearinterpolation{data=[(0.1,1.0),(0.05,0.7),(0.2,0.7),(0.1,0.0)]}"
-coolsound' = "sine{freq=sawtooth{freq=1.0}*100.0+440.0}*expdecay{speed=3.0}*(0.3*sine{freq=40*lineardecay{speed=0.5}}+0.7)*lineardecay{speed=2.0}"
-
-debugcontext = [ ("mysine",
-                  (NormalWavestream normalSine (ConstantWavestream 10.0) 0.0) )
-            ]
-usingctx = "sine{freq=440}*(mysine*0.5+0.5)*linearinterpolation{data=[(0.1,1.0),(0.05,0.7),(0.2,0.7),(0.1,0.0)]}"
-
-myctx = "alpha:sine{freq=10}*0.5+0.5;output:sine{freq=440}*alpha;"
 
 parseLater :: [String] -> WaveBindings -> [Char] -> ScriptType
 parseLater s b t = PartialWavestreamType $ WaveFunctionPartial (\a -> case (runParser expr (b++a) "" t) of
