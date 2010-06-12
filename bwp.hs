@@ -297,10 +297,13 @@ bindingValue = do
 
 fullParser :: GenParser Char WaveBindings WaveBindings
 fullParser = m_whiteSpace >> many (do
+                waves <- getState;
                 x <- m_identifier;
-                y <- bindingValue;
-                updateState (addBinding x y)
-                return (x,y))
+                case (lookupBinding waves x) of
+                    Right _ -> fail ("rebinding name: " ++ x)
+                    _ -> do y <- bindingValue;
+                            updateState (addBinding x y)
+                            return (x,y))
 
 exportFromFile :: String -> String -> Integer -> Double -> IO (Either String [Double])
 exportFromFile wavename filename samplerate maxtime = do

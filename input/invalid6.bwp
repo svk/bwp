@@ -1,0 +1,4 @@
+# A pretty obvious one: redefine symbol.
+
+output: sine{freq=440};
+output: sine{freq=660};
