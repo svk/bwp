@@ -73,3 +73,20 @@ testout15 : goodsound{basewave=triangular{}};
 
 # 13 sounds "nice" but too irritating; 15 is fine
 finalsound : testout15;
+
+# Just to be clear, the above is a work-log. Expressing the sound more neatly:
+
+vf: linearinterpolation{initial=7.0, data=[(0.5,7.0),(0.5,3.0),(1.5,1.5),(2.0,0.5)]};
+mp: linearinterpolation{initial=220.0, data=[(3.0,660.0)]}
+    + sine{freq = vf} * 100;
+sound: triangular{freq=mp}
+    * ((sine{freq=vf} + 1) * 0.5)
+    * linearinterpolation{initial=0.9, data=[(0.2,1.0),(0.3,1.0),(2.0,0.0)]}; 
+
+# How does it sound descending instead of ascending?
+
+mpdesc: linearinterpolation{initial=660.0, data=[(3.0,220.0)]}
+    + sine{freq = vf} * 100;
+sounddesc: triangular{freq=mpdesc}
+    * ((sine{freq=vf} + 1) * 0.5)
+    * linearinterpolation{initial=0.9, data=[(0.2,1.0),(0.3,1.0),(2.0,0.0)]}; 

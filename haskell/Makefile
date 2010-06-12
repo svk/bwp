@@ -1,11 +1,11 @@
-all: Parsing Wavestream
+all: bwp
 
 clean:
 	rm -f *.o
 	rm -f *.hi
 	rm -f *.exe
 
-Sss: Wavestream WavWrite
+bwp: Wavestream WavWrite
 	ghc --make $@
 
 Wavestream:
