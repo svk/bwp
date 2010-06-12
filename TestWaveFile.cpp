@@ -7,7 +7,7 @@ int main(int argc, char *argv[]) {
     ProductWave* tone440 = new ProductWave();
     (*tone440).add( new CutoffEnvelope( 0.0, 3.0 ) )
               .add( new ExponentialFadeoutEnvelope( 2.0 ) )
-              .add( new DynamicSineWave( new SineEnvelope( 0.5, 440.0, 110.0 ) ) );
+              .add( new DynamicSineWave( new SineEnvelope( 10, 440.0, 10.0 ) ) );
 
 
     WaveFileExporter exporter = WaveFileExporter().setRate(44100)
