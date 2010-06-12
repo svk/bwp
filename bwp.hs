@@ -89,10 +89,12 @@ namedWave :: GenParser Char WaveBindings ScriptType
 namedWave = do
                 s <- m_identifier;
                 st <- getState;
+                notFollowedBy $ m_symbol "{";
                 case (lookupBinding st s) of
                     Left msg -> fail ("looking up named wave: " ++ msg)
-                    Right (WavestreamType wave) -> return (WavestreamType wave)
-                    _ -> fail ("wrong type for: " ++ s ++ ", expected named wave")
+                    Right z -> return z
+--                    Right (WavestreamType wave) -> return (WavestreamType wave)
+--                    _ -> fail ("wrong type for: " ++ s ++ ", expected named wave")
 
 numberPair :: GenParser Char WaveBindings (Double, Double)
 numberPair = do
@@ -126,6 +128,13 @@ lookupArgument ((a,v):x) k
     | a == k = Right v
     | otherwise = lookupArgument x k
 
+prepareArgument :: (String,ScriptType) -> (String,ScriptType)
+prepareArgument (name,y@(PartialWavestreamType x@(WaveFunctionPartial f [] a)))
+    = case (evaluateFop x) of
+        Nothing -> (name,y)
+        Just z -> (name,WavestreamType z)
+prepareArgument x = x
+
 funcStream :: GenParser Char WaveBindings ScriptType
 funcStream = do
                 name <- m_identifier;
@@ -136,7 +145,7 @@ funcStream = do
                 case (findFunc name st) of
                     Left s -> fail ("no such function: " ++ name)
                     Right x ->
-                        case (resolveFop arglist x) of
+                        case (resolveFop (map prepareArgument arglist) x) of
                             Left err -> fail ("resolving function " ++ name ++ ": " ++ err)
                             Right f -> case (evaluateFop f) of
                                             Nothing -> return (PartialWavestreamType x)

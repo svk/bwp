@@ -1,4 +1,5 @@
+foosh{q}: q{freq=440};
+fish{q}: sine{freq=q};
+fash: foosh{q=fish};
 # A wart: passing a function pointer without {}
 # Fix either by warning or by making this legal
-foosh{q}: q{freq=440};
-fash: foosh{q=sine};
