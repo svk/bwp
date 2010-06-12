@@ -62,3 +62,11 @@ Language:
         clip{wave,min,max}
 
         random{seed,min,max}
+
+Tool usage:
+    The bwp tool is used to "export" names that are bound to waves
+    to .wav files. This is generally done with:
+        bwp input.bwp wavename output.wav
+
+    To see a list of exportable waves in a file, invoke bwp as merely:
+        bwp input.bwp
