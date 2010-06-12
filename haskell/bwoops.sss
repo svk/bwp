@@ -1,0 +1,21 @@
+# About half a second. Pitch decreasing at the end.
+
+pitchenv: linearinterpolation{initial=0.9,data=[(0.05,1.0),(0.2,1.0),(0.15,0.6),(0.15,0.5)]};
+volenv: lineardecay{speed=2}
+        * expdecay{speed=3}
+        * linearinterpolation{initial=0.0,data=[(0.05,0.5),(0.05,1.0)]};
+
+bwoop{f,q}: f{freq=q*pitchenv} * volenv;
+
+bwoop1: bwoop{f=sine{},q=440};
+bwoop2: bwoop{f=sine{},q=660};
+bwoop3: bwoop{f=sawtooth{},q=440};
+bwoop4: bwoop{f=sawtooth{},q=660};
+
+antipitchenv: linearinterpolation{initial=0.5,data=[(0.05,0.6),(0.2,1.0),(0.15,1.0),(0.15,0.9)]};
+antibwoop{f,q}: f{freq=q*antipitchenv} * volenv;
+antibwoop1: antibwoop{f=sine{},q=440};
+antibwoop2: antibwoop{f=sine{},q=660};
+antibwoop3: antibwoop{f=sawtooth{},q=440};
+antibwoop4: antibwoop{f=sawtooth{},q=660};
+
