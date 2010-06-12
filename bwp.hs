@@ -93,8 +93,6 @@ namedWave = do
                 case (lookupBinding st s) of
                     Left msg -> fail ("looking up named wave: " ++ msg)
                     Right z -> return z
---                    Right (WavestreamType wave) -> return (WavestreamType wave)
---                    _ -> fail ("wrong type for: " ++ s ++ ", expected named wave")
 
 numberPair :: GenParser Char WaveBindings (Double, Double)
 numberPair = do
