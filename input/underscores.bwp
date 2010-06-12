@@ -1,0 +1,21 @@
+# bwoops.bwp except with some underscore. Looks better.
+
+pitch_env: linear_interpolation{initial=0.9,data=[(0.05,1.0),(0.2,1.0),(0.15,0.6),(0.15,0.5)]};
+vol_env: linear_decay{speed=2}
+        * exp_decay{speed=3}
+        * linear_interpolation{initial=0.0,data=[(0.05,0.5),(0.05,1.0)]};
+
+bwoop{f,q}: f{freq=q*pitch_env} * vol_env;
+
+bwoop_1: bwoop{f=sine{},q=440};
+bwoop_2: bwoop{f=sine{},q=660};
+bwoop_3: bwoop{f=sawtooth{},q=440};
+bwoop_4: bwoop{f=sawtooth{},q=660};
+
+antipitch_env: linear_interpolation{initial=0.5,data=[(0.05,0.6),(0.2,1.0),(0.15,1.0),(0.15,0.9)]};
+antibwoop{f,q}: f{freq=q*antipitch_env} * vol_env;
+antibwoop_1: antibwoop{f=sine{},q=440};
+antibwoop_2: antibwoop{f=sine{},q=660};
+antibwoop_3: antibwoop{f=sawtooth{},q=440};
+antibwoop_4: antibwoop{f=sawtooth{},q=660};
+
