@@ -1,0 +1,9 @@
+rwave: random{seed=43,min=440,max=660};
+rfreq: sine{freq=rwave};
+# rfreq doesn't really sound great at all; perhaps it can be used
+# for something else nice.
+noise: random{seed=58,min=-1.0,max=1.0};
+testing: sine{freq=440.0}*0.95 + noise * 0.05;
+testing_clipped: clip{wave=testing,min=-0.9,max=0.9};
+# huh, negative numbers don't work! must be fixed
+# hack for now 0-x

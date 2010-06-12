@@ -3,6 +3,7 @@ module Main where
 import Wavestream
 import List
 import WavWrite
+import System.Random
 
 import System (getArgs)
 
@@ -15,8 +16,8 @@ langDef = emptyDef{ commentLine = "#",
                     opStart = oneOf "+*",
                     identStart = letter <|> char '_',
                     identLetter = alphaNum <|> char '_',
-                    reservedOpNames = ["+", "*", ":", ";"],
-                    opLetter = oneOf "+*:;",
+                    reservedOpNames = ["+", "*", ":", ";", "-"],
+                    opLetter = oneOf "+*:;-",
                     reservedNames = [] }
 TokenParser{ naturalOrFloat = m_naturalOrFloat,
              commaSep = m_commaSep,
@@ -40,9 +41,18 @@ opSum (WavestreamType a) (WavestreamType b) = WavestreamType $ SumWavestream a b
 opSum (PartialWavestreamType (WaveFunctionPartial _ s _)) _ = error ("left argument to sum missing arguments: " ++ show s)
 opSum _ (PartialWavestreamType (WaveFunctionPartial _ s _)) = error ("right argument to sum missing arguments: " ++ show s)
 
+opMinus (WavestreamType a) (WavestreamType b) = WavestreamType $ SumWavestream a (ProductWavestream (ConstantWavestream (-1)) b)
+opMinus (PartialWavestreamType (WaveFunctionPartial _ s _)) _ = error ("left argument to minus missing arguments: " ++ show s)
+opMinus _ (PartialWavestreamType (WaveFunctionPartial _ s _)) = error ("right argument to minus missing arguments: " ++ show s)
+
+opNegate (WavestreamType a) = WavestreamType $ ProductWavestream a (ConstantWavestream (-1))
+opNegate (PartialWavestreamType (WaveFunctionPartial _ s _)) = error ("argument to negate missing arguments: " ++ show s)
+
 tableOperators = [
+                  [Prefix (do {m_reservedOp "-"; return opNegate} )],
                   [Infix (do {m_reservedOp "*"; return opProduct} ) AssocLeft],
-                  [Infix (do {m_reservedOp "+"; return opSum} ) AssocLeft]
+                  [Infix (do {m_reservedOp "+"; return opSum} ) AssocLeft],
+                  [Infix (do {m_reservedOp "-"; return opMinus} ) AssocLeft]
                  ]
 
 term = constantStream <|> try (funcStream) <|> namedWave <|> pairList <|> bracketed <?> "basic expression"
@@ -79,7 +89,7 @@ namedWave = do
                 s <- m_identifier;
                 st <- getState;
                 case (lookupBinding st s) of
-                    Left msg -> fail msg
+                    Left msg -> fail ("looking up named wave: " ++ msg)
                     Right (WavestreamType wave) -> return (WavestreamType wave)
                     _ -> fail ("wrong type for: " ++ s ++ ", expected named wave")
 
@@ -123,7 +133,7 @@ funcStream = do
                 m_symbol "}";
                 st <- getState
                 case (findFunc name st) of
-                    Left s -> fail s
+                    Left s -> fail ("looking up funcstream: " ++ s)
                     Right x ->
                         case (evaluateFop $ resolveFop arglist x) of
                             Left _ -> return (PartialWavestreamType x)
@@ -162,6 +172,8 @@ findFunc "phase_shift" _ = findFunc "phaseshift" []
 findFunc "speedshift" _ = Right $ WaveFunctionPartial (\a -> (SpeedShiftWavestream (wsArg a "wave") (wsArg a "speed"))) ["speed", "wave"] []
 findFunc "speed_shift" _ = findFunc "speedshift" []
 findFunc "delay" _ = Right $ WaveFunctionPartial (\a -> DelayedWavestream (wsArg a "wave") (sample (wsArg a "delay"))) ["delay", "wave"] []
+findFunc "random" _ = Right $ WaveFunctionPartial (\a -> RandomWavestream (mkStdGen (round (sample (wsArg a "seed")))) (wsArg a "min") (wsArg a "max")) ["seed", "min", "max"] []
+findFunc "clip" _ = Right $ WaveFunctionPartial (\a -> ClipWavestream (wsArg a "wave") (wsArg a "min") (wsArg a "max")) ["wave", "min", "max"] []
 findFunc name bindings = case (lookupBinding bindings name) of
                             Right (PartialWavestreamType x) -> Right x
                             _ -> Left name
