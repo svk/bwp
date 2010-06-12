@@ -1,0 +1,3 @@
+# Most common error I'm making: forgetting a semicolon.
+foosh: sine{freq=400}
+fash: foosh;
