@@ -238,20 +238,37 @@ exportFromFile wavename filename samplerate maxtime = do
             Right (WavestreamType wave) -> return $ Right $ exportWavestream wave (1.0/(fromIntegral samplerate)) maxtime
             Left err -> return $ Left ("no such wave: " ++ wavename)
 
+isExportable :: (String, ScriptType) -> Bool
+isExportable (_, (WavestreamType _)) = True
+isExportable _ = False
+
 main = do
         cmdargs <- getArgs
-        let inputFile = cmdargs !! 0
-            waveName = cmdargs !! 1
-            outputFile = cmdargs !! 2
-            maxtime = 3.0
-            samplerate = 44100
-            in do putStrLn ("Writing wave \"" ++ waveName ++ "\" from file \"" ++ inputFile ++ "\" to WAV \"" ++ outputFile ++ "\".")
-                  putStrLn ("Sample rate: " ++ show samplerate)
-                  putStrLn ("Maximum duration: " ++ (show maxtime) ++ " seconds")
-                  result <- exportFromFile waveName inputFile samplerate maxtime
-                  case result of
-                      Left err -> do putStr "error: "
-                                     putStrLn err
-                      Right samples -> do putStrLn "Writing to WAV file."
-                                          writeWav outputFile samples
-                                          putStrLn "Done!"
+        case (length cmdargs) of
+            1 -> let inputFile = cmdargs !! 0
+                 in do filedata <- readFile inputFile
+                       case (runParser fullParser [] "" filedata) of
+                           Left err -> do putStr "Error: "
+                                          putStrLn $ show err
+                           Right waves -> do putStrLn ("Waves in file \"" ++ inputFile ++ "\"")
+                                             printWaves $ map fst (filter isExportable waves)
+                                             where
+                                                printWaves (a:l) = do putStrLn ("\t" ++ a)
+                                                                      printWaves l
+                                                printWaves [] = return ()
+            3 -> let inputFile = cmdargs !! 0
+                     waveName = cmdargs !! 1
+                     outputFile = cmdargs !! 2
+                     maxtime = 3.0
+                     samplerate = 44100
+                     in do putStrLn ("Writing wave \"" ++ waveName ++ "\" from file \"" ++ inputFile ++ "\" to WAV \"" ++ outputFile ++ "\".")
+                           putStrLn ("Sample rate: " ++ show samplerate)
+                           putStrLn ("Maximum duration: " ++ (show maxtime) ++ " seconds")
+                           result <- exportFromFile waveName inputFile samplerate maxtime
+                           case result of
+                                Left err -> do putStr "error: "
+                                               putStrLn err
+                                Right samples -> do putStrLn "Writing to WAV file."
+                                                    writeWav outputFile samples
+                                                    putStrLn "Done!"
+            _ -> do putStrLn "Usage: bwp [input filename] [wave name] [output filename]"
