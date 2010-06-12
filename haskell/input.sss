@@ -5,3 +5,71 @@ vibrato: sine{freq = 10};
 output: gamma{foo = vibrato * 100 + 440}
         * (vibrato * 0.2 + 0.8)
         * expdecay{speed = 3};
+
+
+# Let's make a "sproing" sound: lots of pitch vibrato, pitch starts low and ascends gradually
+
+boring : sine{freq = 440};
+
+volenv : linearinterpolation{initial=0.9, data=[(0.2,1.0),(0.3,1.0),(2.0,0.0)]};
+
+testout1 : boring * volenv;
+
+basepitch : linearinterpolation{initial=220.0, data=[(3.0,660.0)]};
+pitchvib : sine{freq=10} * 100.0;
+totalpitch : basepitch + pitchvib;
+
+testout2 : sine{freq = totalpitch} * volenv;
+
+# Hm, needs slowing down a bit, let's see how it looks with some different vibrato freqs
+
+totalpitch2{x}:basepitch+sine{freq=x}*100;
+wavey{x}:sine{freq=totalpitch2{x=x}}*volenv;
+
+testout3: wavey{x=5.0};
+testout4: wavey{x=7.0};
+
+# Actually the vibrato freq should slow down over time, very much so
+
+vibfreq : linearinterpolation{initial=7.0, data=[(3.0,1.0)]};
+testout5 : wavey{x = vibfreq};
+
+# We're getting there! Now just more so
+
+vibfreq2 : linearinterpolation{initial=7.0, data=[(0.5,3.0),(0.5,1.5),(2.0,0.5)]};
+testout6 : wavey{x = vibfreq2};
+
+# That was a bit over the line
+
+vibfreq3 : linearinterpolation{initial=7.0, data=[(0.5,3.0),(1.5,1.5),(2.0,0.5)]};
+testout7 : wavey{x = vibfreq3};
+
+# Start a bit higher and keep there for a short while?
+vibfreq4 : linearinterpolation{initial=7.0, data=[(0.5,7.0),(0.5,3.0),(1.5,1.5),(2.0,0.5)]};
+testout8 : wavey{x = vibfreq4};
+
+# Good! Now we just want some volume vibration in that same rhythm
+volvib : (sine{freq=vibfreq4} + 1) * 0.5;
+testout9 : wavey{x = vibfreq4} * volvib;
+
+# Add an echo? okay, getting tacky now, I think testout9 is about what I was aiming for
+testout10 : testout9 + delay{delay=0.3,wave=testout9};
+# Ew, that clipped!
+testout11 : testout10 * 0.5;
+# As I suspected in any case; sounds tacky.
+
+# What we really need to do is to try out testout9 with some different
+# base waves.
+# Note a PITFALL: when passing a function as an argument, we need to
+#                 "partially apply" it with zero arguments:
+#                 CORRECT: goodsound{basewave=sine{}}
+#                 WRONG: goodsound{basewave=sine}
+# Might want to adjust this later, it confused me here initially.
+goodsound{basewave} : basewave{freq=totalpitch2{x=vibfreq4}} * volvib * volenv;
+testout12 : goodsound{basewave=sine{}};
+testout13 : goodsound{basewave=sawtooth{}};
+testout14 : goodsound{basewave=square{}};
+testout15 : goodsound{basewave=triangular{}};
+
+# 13 sounds "nice" but too irritating; 15 is fine
+finalsound : testout15;

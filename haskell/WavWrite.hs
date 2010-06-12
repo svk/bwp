@@ -29,10 +29,11 @@ writeWavHeader n = do
 
 convertSample :: Double -> Word16
 convertSample x
-    | x' < 0 = 0xffff + x'
-    | otherwise = x'
+    | x'' < 0 = 0xffff + x''
+    | otherwise = x''
     where
-        x' = round $ 32767 * x
+        x' = max (-1.0) (min 1.0 x)
+        x'' = round $ 32767 * x'
 
 writeWavData :: [Double] -> Put
 writeWavData (x:[]) = do

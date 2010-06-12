@@ -88,6 +88,7 @@ namedWave = do
                 case (lookupBinding st s) of
                     Left msg -> fail msg
                     Right (WavestreamType wave) -> return (WavestreamType wave)
+                    _ -> fail ("wrong type for: " ++ s ++ ", expected named wave")
 
 numberPair :: GenParser Char WaveBindings (Double, Double)
 numberPair = do
@@ -142,12 +143,14 @@ wsArg :: [(String,ScriptType)] -> String -> Wavestream
 wsArg ((n,(WavestreamType v)):nvs) s
     | n == s = v
     | otherwise = wsArg nvs s
+wsArg (_:nvs) s = wsArg nvs s
 wsArg [] s = error ("no such argument: " ++ s)
 
 daArg :: [(String,ScriptType)] -> String -> [(Double,Double)]
 daArg ((n,(PairListType v)):nvs) s
     | n == s = v
     | otherwise = daArg nvs s
+daArg (_:nvs) s = daArg nvs s
 daArg [] s = error ("no such argument: " ++ s)
 
 findFunc :: String -> WaveBindings -> Either String WaveFunctionPartial

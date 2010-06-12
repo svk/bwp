@@ -11,7 +11,7 @@ normalSine x | x >= 0.0 && x <= 1.0 = sin ( x * 2 * pi )
 
 normalSquare :: (Ord a, Floating a) => a -> a
 normalSquare x | x >= 0.0 && x < 0.5 = 1.0
-               | x >= 0.5 && x <= 1.0 = 0.0
+               | x >= 0.5 && x <= 1.0 = -1.0
 
 normalSawtooth :: (Ord a, Floating a) => a -> a
 normalSawtooth x = 2 * x - 1
@@ -64,6 +64,7 @@ advance dt (LinearInterpolationWavestream l@((duration,v1):dvs) t v0)
         t' = t + dt
 advance dt (LinearInterpolationWavestream [] t v0) = LinearInterpolationWavestream [] (t + dt) v0
 advance dt (SpeedShiftWavestream wave a) = SpeedShiftWavestream (advance (dt * (sample a)) wave) (advance dt a)
+advance dt (DelayedWavestream a 0.0) = DelayedWavestream (advance dt a) 0.0
 advance dt (DelayedWavestream a b) = DelayedWavestream a (max 0.0 (b - dt))
 
 nil :: Wavestream -> Bool
