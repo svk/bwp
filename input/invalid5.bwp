@@ -3,3 +3,8 @@ fish{q}: sine{freq=q};
 fash: foosh{q=fish};
 # A wart: passing a function pointer without {}
 # Fix either by warning or by making this legal
+#
+# A language bug (now fixed):
+#   when doing this with a PRIMITIVE,
+#   we still have to use {}.
+#   e.g. sine{}

@@ -115,7 +115,9 @@ addBinding :: String -> ScriptType -> [(String,ScriptType)] -> [(String, ScriptT
 addBinding s w l = ((s,w):l)
 
 lookupBinding :: [(String,ScriptType)] -> String -> Either String ScriptType
-lookupBinding [] s = Left ("no such binding: " ++ s)
+lookupBinding [] s = case (findFunc s []) of
+                        Left _ -> Left ("no such binding: " ++ s)
+                        Right f -> Right $ PartialWavestreamType f
 lookupBinding ((a,v):x) k
     | a == k = Right v
     | otherwise = lookupBinding x k
@@ -184,6 +186,7 @@ findFunc "speed_shift" _ = findFunc "speedshift" []
 findFunc "delay" _ = Right $ WaveFunctionPartial (\a -> DelayedWavestream (wsArg a "wave") (sample (wsArg a "delay"))) ["delay", "wave"] []
 findFunc "random" _ = Right $ WaveFunctionPartial (\a -> RandomWavestream (mkStdGen (round (sample (wsArg a "seed")))) (wsArg a "min") (wsArg a "max")) ["seed", "min", "max"] []
 findFunc "clip" _ = Right $ WaveFunctionPartial (\a -> ClipWavestream (wsArg a "wave") (wsArg a "min") (wsArg a "max")) ["wave", "min", "max"] []
+findFunc name [] = Left name
 findFunc name bindings = case (lookupBinding bindings name) of
                             Right (PartialWavestreamType x) -> Right x
                             _ -> Left name

@@ -1,0 +1,15 @@
+
+basefreq: linear_interpolation{initial=440,data=[(3.0,330)]};
+saw_01: ((sawtooth{freq=1}+1)*0.5);
+slowdownx: linear_interpolation{initial=5,data=[(3.0,0.0)]};
+slowdown: exp_decay{speed=0.3}*5;
+sawfreq: speed_shift{wave=saw_01,speed=slowdown} * 220 + basefreq;
+
+volenv: exp_decay{speed=3.5};
+
+t{f}: f{freq=sawfreq} * volenv;
+
+sine_sf: t{f=sine};
+saw_sf: t{f=sawtooth};
+square_sf: t{f=square};
+triangular_sf: t{f=triangular};
