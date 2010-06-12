@@ -232,7 +232,7 @@ bindingValue :: GenParser Char WaveBindings ScriptType
 bindingValue = do
                     m_symbol ":";
                     y <- expr;
-                    m_symbol ";";
+                    m_symbol ";" <?> "line-terminating semicolon (';')";
                     return y;
                <|> do
                     m_symbol "{";
