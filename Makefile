@@ -6,10 +6,10 @@ clean:
 	rm -f *.exe
 
 bwp: Wavestream WavWrite
-	ghc --make $@
+	ghc --make $@ -Wall
 
 Wavestream:
-	ghc --make $@
+	ghc --make $@ -Wall
 
 WavWrite:
-	ghc --make $@
+	ghc --make $@ -Wall

@@ -13,6 +13,7 @@ import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Token
 import Text.ParserCombinators.Parsec.Language
 
+langDef :: LanguageDef st
 langDef = emptyDef{ commentLine = "#",
                     opStart = oneOf "+*",
                     identStart = letter <|> char '_',
@@ -20,6 +21,14 @@ langDef = emptyDef{ commentLine = "#",
                     reservedOpNames = ["+", "*", ":", ";", "-"],
                     opLetter = oneOf "+*:;-",
                     reservedNames = [] }
+
+m_naturalOrFloat :: GenParser Char WaveBindings (Either Integer Double)
+m_symbol :: String -> GenParser Char WaveBindings String
+m_identifier :: GenParser Char WaveBindings String
+m_reservedOp :: String -> GenParser Char WaveBindings ()
+m_whiteSpace :: GenParser Char WaveBindings ()
+m_commaSep :: (GenParser Char WaveBindings a) -> GenParser Char WaveBindings [a]
+m_commaSep1 :: (GenParser Char WaveBindings a) -> GenParser Char WaveBindings [a]
 TokenParser{ naturalOrFloat = m_naturalOrFloat,
              commaSep = m_commaSep,
              commaSep1 = m_commaSep1,
@@ -34,35 +43,45 @@ expr :: GenParser Char WaveBindings ScriptType
 expr = buildExpressionParser tableOperators term
     <?> "expression"
 
+opProduct :: ScriptType -> ScriptType -> ScriptType
 opProduct (WavestreamType a) (WavestreamType b) = WavestreamType $ ProductWavestream a b
 opProduct (PartialWavestreamType (WaveFunctionPartial _ s _)) _ = error ("left argument to product missing arguments: " ++ show s)
 opProduct _ (PartialWavestreamType (WaveFunctionPartial _ s _)) = error ("right argument to product missing arguments: " ++ show s)
+opProduct _ _ = error "type-improper multiplication"
 
+opSum :: ScriptType -> ScriptType -> ScriptType
 opSum (WavestreamType a) (WavestreamType b) = WavestreamType $ SumWavestream a b
 opSum (PartialWavestreamType (WaveFunctionPartial _ s _)) _ = error ("left argument to sum missing arguments: " ++ show s)
 opSum _ (PartialWavestreamType (WaveFunctionPartial _ s _)) = error ("right argument to sum missing arguments: " ++ show s)
+opSum _ _ = error "type-improper addition"
 
+opMinus :: ScriptType -> ScriptType -> ScriptType
 opMinus (WavestreamType a) (WavestreamType b) = WavestreamType $ SumWavestream a (ProductWavestream (ConstantWavestream (-1)) b)
 opMinus (PartialWavestreamType (WaveFunctionPartial _ s _)) _ = error ("left argument to minus missing arguments: " ++ show s)
 opMinus _ (PartialWavestreamType (WaveFunctionPartial _ s _)) = error ("right argument to minus missing arguments: " ++ show s)
+opMinus _ _ = error "type-improper subtraction"
 
+opNegate :: ScriptType -> ScriptType
 opNegate (WavestreamType a) = WavestreamType $ ProductWavestream a (ConstantWavestream (-1))
 opNegate (PartialWavestreamType (WaveFunctionPartial _ s _)) = error ("argument to negate missing arguments: " ++ show s)
+opNegate _ = error "type-improper negation"
 
+tableOperators :: OperatorTable Char WaveBindings ScriptType
 tableOperators = [
-                  [Prefix (do {m_reservedOp "-"; return opNegate} )],
-                  [Infix (do {m_reservedOp "*"; return opProduct} ) AssocLeft],
-                  [Infix (do {m_reservedOp "+"; return opSum} ) AssocLeft],
-                  [Infix (do {m_reservedOp "-"; return opMinus} ) AssocLeft]
+                  [Prefix (do {_ <- m_reservedOp "-"; return opNegate} )],
+                  [Infix (do {_ <- m_reservedOp "*"; return opProduct} ) AssocLeft],
+                  [Infix (do {_ <- m_reservedOp "+"; return opSum} ) AssocLeft],
+                  [Infix (do {_ <- m_reservedOp "-"; return opMinus} ) AssocLeft]
                  ]
 
+term :: GenParser Char WaveBindings ScriptType
 term = constantStream <|> try (namedWave) <|> funcStream <|> pairList <|> bracketed <?> "basic expression"
 
 pairList :: GenParser Char WaveBindings ScriptType
 pairList = do
-    m_symbol "[";
+    _ <- m_symbol "[";
     valuelist <- m_commaSep numberPair;
-    m_symbol "]";
+    _ <- m_symbol "]";
     return (PairListType valuelist)
 
 
@@ -81,6 +100,12 @@ data ScriptType = WavestreamType Wavestream
                   | PairListType [(Double,Double)]
                   | PartialWavestreamType WaveFunctionPartial
 
+
+describeST :: ScriptType -> String
+describeST (WavestreamType _) = "wavestream"
+describeST (PairListType _) = "pair list"
+describeST (PartialWavestreamType (WaveFunctionPartial _ a _)) = "partially evaluated wavestream (" ++ (foldl (\x y -> x ++ ", " ++ y) (head a) (tail a)) ++ ")"
+
 toDouble :: (Either Integer Double) -> Double
 toDouble (Left n) = fromIntegral n
 toDouble (Right x) = x
@@ -96,18 +121,18 @@ namedWave = do
 
 numberPair :: GenParser Char WaveBindings (Double, Double)
 numberPair = do
-                m_symbol "(";
+                _ <- m_symbol "(";
                 x <- m_naturalOrFloat;
-                m_symbol ",";
+                _ <- m_symbol ",";
                 y <- m_naturalOrFloat;
-                m_symbol ")";
+                _ <- m_symbol ")";
                 return (toDouble x, toDouble y)
 
 
 argument :: GenParser Char WaveBindings (String, ScriptType)
 argument = try (do
                 name <- m_identifier;
-                m_symbol "=";
+                _ <- m_symbol "=";
                 val <- expr;
                 return (name,val);)
 
@@ -129,7 +154,7 @@ lookupArgument ((a,v):x) k
     | otherwise = lookupArgument x k
 
 prepareArgument :: (String,ScriptType) -> (String,ScriptType)
-prepareArgument (name,y@(PartialWavestreamType x@(WaveFunctionPartial f [] a)))
+prepareArgument (name,y@(PartialWavestreamType x@(WaveFunctionPartial _ [] _)))
     = case (evaluateFop x) of
         Nothing -> (name,y)
         Just z -> (name,WavestreamType z)
@@ -138,12 +163,12 @@ prepareArgument x = x
 funcStream :: GenParser Char WaveBindings ScriptType
 funcStream = do
                 name <- m_identifier;
-                m_symbol "{";
+                _ <- m_symbol "{";
                 arglist <- argumentList
-                m_symbol "}";
+                _ <- m_symbol "}";
                 st <- getState
                 case (findFunc name st) of
-                    Left s -> fail ("no such function: " ++ name)
+                    Left _ -> fail ("no such function: " ++ name)
                     Right x ->
                         case (resolveFop (map prepareArgument arglist) x) of
                             Left err -> fail ("resolving function " ++ name ++ ": " ++ err)
@@ -207,30 +232,34 @@ evaluateFop (WaveFunctionPartial _ _ _) = Nothing
 
 bracketed :: GenParser Char WaveBindings ScriptType
 bracketed =     do
-                    m_symbol "(";
+                    _ <- m_symbol "(";
                     x <- expr;
-                    m_symbol ")";
+                    _ <- m_symbol ")";
                     return x;
             <?> "bracketed expression"
 
-operatorPlus = (+)
-
+outputSample :: Wavestream -> Double -> IO()
 outputSample wave t = do
     putStr $ show $ t
     putStr $ " "
     putStrLn $ show $ (sample wave)
 
+outputWavestreamFrom :: Double -> Wavestream -> Double -> Double -> IO()
 outputWavestreamFrom t wave dt maxTime
     | (nil wave) || (t > maxTime) = outputSample wave t
     | otherwise = do
         outputSample wave t
         outputWavestreamFrom (t + dt) (advance dt wave) dt maxTime
 
+exportWavestreamFrom :: Double -> Wavestream -> Double -> Double -> [Double]
 exportWavestreamFrom t wave dt maxTime
     | (nil wave) || (t > maxTime) = []
     | otherwise = ((sample wave):exportWavestreamFrom (t + dt) (advance dt wave) dt maxTime)
 
+outputWavestream :: Wavestream -> Double -> Double -> IO()
 outputWavestream = outputWavestreamFrom 0
+
+exportWavestream :: Wavestream -> Double -> Double -> [Double]
 exportWavestream = exportWavestreamFrom 0
 
 parseLater :: [String] -> WaveBindings -> [Char] -> ScriptType
@@ -242,54 +271,56 @@ parseLater s b t = PartialWavestreamType $ WaveFunctionPartial (\a -> case (runP
 checkParseExpr :: GenParser Char WaveBindings [String]
 checkParseExpr = buildExpressionParser tableOperatorsCheck termCheck
 
+tableOperatorsCheck :: OperatorTable Char WaveBindings [String]
 tableOperatorsCheck = [
-                  [Prefix (do {m_reservedOp "-"; return id} )],
-                  [Infix (do {m_reservedOp "*"; return union} ) AssocLeft],
-                  [Infix (do {m_reservedOp "+"; return union} ) AssocLeft],
-                  [Infix (do {m_reservedOp "-"; return union} ) AssocLeft]
+                  [Prefix (do {_ <- m_reservedOp "-"; return id} )],
+                  [Infix (do {_ <- m_reservedOp "*"; return union} ) AssocLeft],
+                  [Infix (do {_ <- m_reservedOp "+"; return union} ) AssocLeft],
+                  [Infix (do {_ <- m_reservedOp "-"; return union} ) AssocLeft]
                  ]
 
+termCheck :: GenParser Char WaveBindings [String]
 termCheck = do
-                x <- constantStream;
+                _ <- constantStream;
                 return []
             <|> try (do
                     s <- m_identifier;
                     st <- getState;
                     notFollowedBy $ m_symbol "{";
                     case (lookupBinding st s) of
-                        Left msg -> return [s]
-                        Right z -> return []
+                        Left _ -> return [s]
+                        Right _ -> return []
                 )
             <|> do
-                    s <- m_identifier;
-                    m_symbol "{";
+                    _ <- m_identifier;
+                    _ <- m_symbol "{";
                     arglist <- m_commaSep (do
-                            n <- m_identifier;
-                            m_symbol "=";
+                            _ <- m_identifier;
+                            _ <- m_symbol "=";
                             v <- checkParseExpr;
                             return v;)
-                    m_symbol "}";
+                    _ <- m_symbol "}";
                     return $ foldl union [] arglist
             <|> do
-                    x <- pairList;
+                    _ <- pairList;
                     return []
             <|> do
-                    m_symbol "(";
+                    _ <- m_symbol "(";
                     x <- checkParseExpr;
-                    m_symbol ")";
+                    _ <- m_symbol ")";
                     return x;
 
 bindingValue :: GenParser Char WaveBindings ScriptType
 bindingValue = do
-                    m_symbol ":";
+                    _ <- m_symbol ":";
                     y <- expr;
-                    m_symbol ";" <?> "line-terminating semicolon (';')";
+                    _ <- m_symbol ";" <?> "line-terminating semicolon (';')";
                     return y;
                <|> do
-                    m_symbol "{";
+                    _ <- m_symbol "{";
                     names <- m_commaSep1 m_identifier
-                    m_symbol "}";
-                    m_symbol ":";
+                    _ <- m_symbol "}";
+                    _ <- m_symbol ":";
                     statenow <- getState
                     unparsed <- manyTill anyChar (try (m_symbol ";"))
                     case (runParser checkParseExpr statenow "" unparsed) of
@@ -315,12 +346,14 @@ exportFromFile wavename filename samplerate maxtime = do
         Left err -> return $ Left $ show err
         Right waves -> case (lookupBinding waves wavename) of
             Right (WavestreamType wave) -> return $ Right $ exportWavestream wave (1.0/(fromIntegral samplerate)) maxtime
-            Left err -> return $ Left ("no such wave: " ++ wavename)
+            Left _ -> return $ Left ("no such wave: " ++ wavename)
+            _ -> return $ Left ("internal error; wrong type")
 
 isExportable :: (String, ScriptType) -> Bool
 isExportable (_, (WavestreamType _)) = True
 isExportable _ = False
 
+main :: IO()
 main = do
         cmdargs <- getArgs
         case (length cmdargs) of
@@ -329,12 +362,17 @@ main = do
                        case (runParser fullParser [] "" filedata) of
                            Left err -> do putStr "Error: "
                                           putStrLn $ show err
-                           Right waves -> do putStrLn ("Waves in file \"" ++ inputFile ++ "\"")
+                           Right waves -> do putStrLn ("Names in file \"" ++ inputFile ++ "\"")
+                                             printOthers $ filter (not . isExportable) waves
+                                             putStrLn ""
                                              printWaves $ map fst (filter isExportable waves)
                                              where
                                                 printWaves (a:l) = do putStrLn ("\t" ++ a)
                                                                       printWaves l
                                                 printWaves [] = return ()
+                                                printOthers ((n,w):l) = do putStrLn ("\t" ++ n ++ "(" ++ (describeST w) ++ ")")
+                                                                           printOthers l
+                                                printOthers [] = return()
             3 -> let inputFile = cmdargs !! 0
                      waveName = cmdargs !! 1
                      outputFile = cmdargs !! 2

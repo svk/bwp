@@ -1,4 +1,4 @@
-module WavWrite where
+module WavWrite (writeWav) where
 
 import qualified Data.ByteString.Lazy as B
 import Data.Binary.Put
@@ -7,7 +7,9 @@ import Data.Word
 
 import qualified Data.ByteString.Lazy.Char8 as BE
 
+channels :: Int
 channels = 2
+samplerate :: Int
 samplerate = 44100
 
 
@@ -36,15 +38,14 @@ convertSample x
         x'' = round $ 32767 * x'
 
 writeWavData :: [Double] -> Put
-writeWavData (x:[]) = do
-    putWord16le $ convertSample x
-    putWord16le $ convertSample x
 writeWavData (x:xs) = do
     putWord16le $ convertSample x
     putWord16le $ convertSample x
     writeWavData xs
+writeWavData [] = return ()
     
 
+writeWav :: String -> [Double] -> IO()
 writeWav filename samples = do
     h <- openBinaryFile filename WriteMode
     B.hPut h $ runPut (writeWavHeader (length samples))

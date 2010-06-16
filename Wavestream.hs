@@ -9,13 +9,16 @@ import System.Random
 
 normalSine :: (Ord a, Floating a) => a -> a
 normalSine x | x >= 0.0 && x <= 1.0 = sin ( x * 2 * pi )
+             | otherwise = error "normal argument outside range"
 
 normalSquare :: (Ord a, Floating a) => a -> a
 normalSquare x | x >= 0.0 && x < 0.5 = 1.0
                | x >= 0.5 && x <= 1.0 = -1.0
+               | otherwise = error "normal argument outside range"
 
 normalSawtooth :: (Ord a, Floating a) => a -> a
-normalSawtooth x = 2 * x - 1
+normalSawtooth x | x >= 0.0 && x <= 1.0 = 2 * x - 1
+                 | otherwise = error "normal argument outside range"
 
 data Wavestream = ConstantWavestream Double
                 | NormalWavestream (Double -> Double) Wavestream Double
@@ -31,17 +34,17 @@ data Wavestream = ConstantWavestream Double
 
 sample :: Wavestream -> Double
 sample (ConstantWavestream z) = z
-sample (NormalWavestream f a t) = f t
+sample (NormalWavestream f _ t) = f t
 sample (SumWavestream a b) = (sample a) + (sample b)
 sample (ProductWavestream a b) = (sample a) * (sample b)
 sample (DelayedWavestream a 0.0) = (sample a)
 sample (DelayedWavestream _ _) = 0
-sample (FadeoutWavestream f a t e)
+sample (FadeoutWavestream f _ t e)
     | rv >= e = rv
     | otherwise = 0
         where
             rv = f t
-sample (FadeinWavestream f a t e)
+sample (FadeinWavestream f _ t e)
     | rv < (1-e) = rv
     | otherwise = 1
         where
@@ -60,7 +63,7 @@ sample (ClipWavestream w mn mx)
         ma = sample mx
 
 advance :: Double -> Wavestream -> Wavestream
-advance dt a@(ConstantWavestream _) = a
+advance _ a@(ConstantWavestream _) = a
 advance dt (NormalWavestream f a t) = NormalWavestream f a' t'
     where
         a' = (advance dt a)
@@ -85,7 +88,7 @@ nil :: Wavestream -> Bool
 nil (ConstantWavestream z) = z == 0
 nil (SumWavestream a b) = (nil a) && (nil b)
 nil (ProductWavestream a b) = (nil a) || (nil b)
-nil w@(FadeoutWavestream f a t e) = (sample w) == 0
+nil w@(FadeoutWavestream _ _ _ _) = (sample w) == 0
 nil (LinearInterpolationWavestream [] _ v0) = v0 == 0
 nil (SpeedShiftWavestream wave _) = nil wave
 nil (DelayedWavestream wave 0.0) = nil wave
@@ -113,10 +116,13 @@ fixed (RandomWavestream _ mn mx) = fixed mn && fixed mx
 fixed (ClipWavestream w mn mx) = (fixed mn && fixed mx)
                                  &&
                                  ((sample mn == sample mx) || fixed w)
+fixed _ = False
+
+debugShowWavestream :: Wavestream -> Integer -> IO ()
 
 debugShowWavestream x n
     | n > 0 = do
         putStrLn $ show $ sample $ x
         debugShowWavestream (advance 0.01 x) (n-1)
-    | n <= 0  = do
+    | otherwise = do
         putStrLn $ show $ sample $ x
