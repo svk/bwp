@@ -119,14 +119,24 @@ namedWave = do
                     Left msg -> fail ("looking up named wave: " ++ msg)
                     Right z -> return z
 
+signedDouble :: GenParser Char WaveBindings Double
+signedDouble = do
+                    _ <- m_reservedOp "-";
+                    x <- m_naturalOrFloat;
+                    return (-(toDouble x));
+               <|> do
+                    x <- m_naturalOrFloat;
+                    return (toDouble x)
+               <?> "signed number"
+
 numberPair :: GenParser Char WaveBindings (Double, Double)
 numberPair = do
                 _ <- m_symbol "(";
-                x <- m_naturalOrFloat;
+                x <- signedDouble;
                 _ <- m_symbol ",";
-                y <- m_naturalOrFloat;
+                y <- signedDouble;
                 _ <- m_symbol ")";
-                return (toDouble x, toDouble y)
+                return (x,y)
 
 
 argument :: GenParser Char WaveBindings (String, ScriptType)
@@ -370,7 +380,7 @@ main = do
                                                 printWaves (a:l) = do putStrLn ("\t" ++ a)
                                                                       printWaves l
                                                 printWaves [] = return ()
-                                                printOthers ((n,w):l) = do putStrLn ("\t" ++ n ++ "(" ++ (describeST w) ++ ")")
+                                                printOthers ((n,w):l) = do putStrLn ("\t" ++ n ++ " (" ++ (describeST w) ++ ")")
                                                                            printOthers l
                                                 printOthers [] = return()
             3 -> let inputFile = cmdargs !! 0
